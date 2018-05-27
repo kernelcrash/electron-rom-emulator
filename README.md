@@ -11,20 +11,20 @@ https://github.com/hoglet67/MMFS, but should be able to emulate any 16KB Electro
 - Emulates the sideways ROM register at FE05
 - Emulates the printer output port at FC71, and printer ACK in FC72. 
   On my cheap STM32F407VET6 board, the onboard SD card adapter is prewired like so
-
+```
    /CS    - PC11
    MOSI   - PD2
    SCK    - PC12
 
    MISO   - PC8
-
+```
   Per the MMFS ROM wiring guide for connecting an SD card to the printer port of a Plus 1,
-
+```
    FC71 D0 goes to MOSI
    FC71 D1 goes to SCK
 
    FC72 D7 goes to MISO
-
+```
 - Wiring from the 50 pin edge connector on the Electron to the STM42F407VET6 board is as follows
 ```
 	   BOTTOM	TOP (towards the AC INPUT)
