@@ -1,16 +1,16 @@
 Electron ROM Emulator
 =====================
-kernel at kernelcrash dot com
+kernel at kernelcrash dot com. 
 More details on this at www.kernelcrash.com
 
 - A bit like an Electron Plus 1 specifically set up for hooking an SD card onto it and using the MMFS ROM 
 https://github.com/hoglet67/MMFS, but should be able to emulate any 16KB Electron ROM
 - Plug a cheap STM32F407 board directly into the expansion connector of the Electron. Most F407 pins are 5V tolerant
-- Can have up to four 16KB roms loaded. See the .incbin references at the top of poller. You need at least one uncommented
-- Roms load as ROM 12, 13, 14 and 15 . Just ad an incbin line in the poller.S for each ROM you want to add
+- Can have up to four 16KB roms loaded. See the .incbin references at the top of poller.S. You need at least one uncommented
+- Roms load as ROM 12, 13, 14 and 15 . Just add an incbin line in the poller.S for each ROM you want to add
 - Emulates the sideways ROM register at FE05
 - Emulates the printer output port at FC71, and printer ACK in FC72. 
-  On my cheap STM32F407VET6 board, the onboard SD card adapter is prewired like so
+  On a cheap STM32F407VET6 board, the onboard SD card adapter is prewired like so
 ```
    /CS    - PC11
    MOSI   - PD2
@@ -59,8 +59,8 @@ https://github.com/hoglet67/MMFS, but should be able to emulate any 16KB Electro
 - Watches for the rising edge of Theta0
 - As soon as Theta0 goes high, we have 250ns to read the databus on
   PE0 to PE15, r/w on PC1 and then look up from a copy of a ROM and present it on PD8 to PD15, and
-  as soon as Theta0 goes low we have to instantly tristate out databus on PD8 to PD15.
-- Very time critical code in ARM assembly
+  as soon as Theta0 goes low we have to instantly tristate the databus on PD8 to PD15.
+- Time critical code in ARM assembly
 - Works well with MMFS. See MMFS page ; https://github.com/hoglet67/MMFS for how to use MMFS. Most
  likely you will want to FAT32 format a micro SD card and put a BEEB.MMB file on it.
 
