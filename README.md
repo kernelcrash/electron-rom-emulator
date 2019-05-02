@@ -55,6 +55,14 @@ instead then I would go :
 This interface is effectively a proof of concept for simple communication between the 
 interupt and a main outer loop that runs on the stm32f4 board.
 
+Currently there are four memory addresses that correspond to the 4 rom slots;
+```
+   &FC0C   - rom slot 12
+   &FC0D   - rom slot 13
+   &FC0E   - rom slot 14
+   &FC0F   - rom slot 15
+```
+
 Wiring
 ======
 
