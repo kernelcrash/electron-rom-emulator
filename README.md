@@ -28,25 +28,32 @@ Most F407 pins are 5V tolerant. Some of these boards have a micro SD card slot, 
 It's recommended to use the sideways ram version of MMFS (ESWMMFS.rom) as it sets 
 PAGE = E00, which is more compatible with a lot of games compared to the standard
  EMMFS.rom . Note, MMFS has a very minimal FAT interface layer, so you should always
- format the SD card (the first partition), copy your BEEB.MMB onto it, then make all
+ format the SD card (the first partition), copy your BEEB.MMB onto it (doing this 
+as the first filecopy to a freshly formatted SD card is pretty important), then make all
  the boot directories (eg. boot/12, boot/13 etc) and then copy the appropriate roms into those 
  directories.
 
+- You can also dynamically insert roms off the SD card while the Electron is running.
+So after you've set up the roms you want on boot nder 'boot', create a 'roms' directory
+in the root of the SD card. Then create numbered directories underneath it and put a single 
+16K rom in each directory. For example;
 ```
-      rom_base:
-      .incbin "roms/ESWMMFS.rom"
-      .incbin "roms/AP6v130ta.rom"
+   roms/1/Hopper.rom
+   roms/2/Viewsheet.rom
 ```
-
-- Basically 
-  - download the 16K rom files you want to repload (definitely get ESWMMFS.rom!)
-  - Add these into interrupt.S under rom_base
-  - Update main.h with the number of roms you are preloading
-  - Compile the code
-  - use dfu-util or openocd or something to transfer the .hex file to the stm32f407 board
-  - Format an SD card with FAT32. Probably keep it to one partition less than 4GB in size.
-  - Get a BEEB.MMB file from somewhere in the stardot forums and put it on the SD card.
-  - Power it up. If you have the sideways ram version of MMFS , you should see 'Electron MMFS SWRAM EPP' on the Electron screen 
+So boot the Electron now with the SD card inserted. Let's says you want to insert Hopper
+into rom slot 15. 15 is 'F' in hex, so type this at the Electron prompt
+```
+   ?&FC0F = 1
+```
+That tells it to take the rom in 'roms/1' and insert it into slot 15 (ie. 'F'). If I wanted
+to put Viewsheet in I would go '?&FC0F = 2' . If I wanted Hopper in slot 14 (ie. 'E' ) 
+instead then I would go :
+```
+   ?&FC0E = 1
+```
+This interface is effectively a proof of concept for simple communication between the 
+interupt and a main outer loop that runs on the stm32f4 board.
 
 Wiring
 ======
