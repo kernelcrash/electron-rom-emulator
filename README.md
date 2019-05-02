@@ -34,7 +34,7 @@ as the first filecopy to a freshly formatted SD card is pretty important), then 
  directories.
 
 - You can also dynamically insert roms off the SD card while the Electron is running.
-So after you've set up the roms you want on boot nder 'boot', create a 'roms' directory
+So after you've set up the roms you want on boot under 'boot', create a 'roms' directory
 in the root of the SD card. Then create numbered directories underneath it and put a single 
 16K rom in each directory. For example;
 ```
@@ -52,6 +52,9 @@ instead then I would go :
 ```
    ?&FC0E = 1
 ```
+After you insert a ROM like this, you can ctrl-break to reboot the Electron, and hopefully
+you should be able to interact with the ROM. 
+
 This interface is effectively a proof of concept for simple communication between the 
 interupt and a main outer loop that runs on the stm32f4 board.
 
@@ -164,24 +167,25 @@ of phi0
      - because we are in an ISR routine this falling edge does
        not cause another interrupt.
      - We don't exit the ISR. Effectively we 'loop round' and
-       watch for the next positive edge. We don't end looping
+       watch for the next positive edge. We don't end iup looping
        around forever as we will eventually hit a RAM access or
        upper ROM/peripherals access that will allow us to exit
        the ISR.
 
 Still this is a miniscule amount of time to service an interrupt. Key stuff:
 
-- memory iand IO accesses consume more time than you think
+- memory and IO accesses consume more time than you think
 - branches consume more time than you think
 - ARM will automatically push r0,r1,r2,r3 and r12 on entry to the ISR and
 pop them when you leave. You can obviously push and pop additional registers,
 but because push and pop are memory operations, there is a fair time penalty
 to do that.
-- The Floating Point Unit (FPU) is generally unused in the stm32f4. But it
-has 32 x 32bit registers (s0 to s31) . These are generally used for floating point math,
+- The stm32f407 has a Floating Point Unit (FPU) and normally I would disable it
+as I don't use any floating point operations. However, it has 32 x 32bit
+registers (s0 to s31) . These are generally used for floating point math,
 but you can move them to and from normal registers, and you can also store them
 to memory locations (using a regular register for an address base)
-- So we use lots of FPU registers to store 'global values' used by the  ISR. This
+- So now I use lots of FPU registers to store 'global values' used by the  ISR. This
 way the ISR does not need to load these from memory during the ISR. eg. register s3
 is used to store the base address for EXTI (used by lots of interrupt related activities).
 We are also often using the values 0 and 1, so two registers are effectively wasted as 
@@ -193,12 +197,14 @@ constants for 0 and 1 (in my case s0 = 0 and s1 = 1).  eg.
 Compiling
 =========
 
-You need the ST standard peripheral library. In the Makefile ST_COMMON points to it.
+You need the ST standard peripheral library. I used the STSW-STM32068
+firmware package for the stmf4 Discovery from st.com. In the Makefile ST_COMMON 
+needs to point to it.
 
 You need an ARM GCC build chain in your path.
 
-You will need some roms. Generally you want at least the ESWMMFS.rom in the roms folder. Add some
-incbin lines in interrupt.S referring to the roms you want to preload.
+Generally you put your roms on the SD card, but there is way to load some from
+internal flash (see troubleshooting notes further down).
 
 Do a 
 ```
@@ -230,7 +236,17 @@ find BEEB.MMB. Any other files on the SD card are used directly by the stm32f407
  you boot the Electron. Try doing a ctrl-break on the Electron to get the Electron to boot
  without power cycling the stm32f407 board. 
 
-There's also the possibility that the interface to the SD card is not really working well at
+ - Normally when an SD card is initialised in SPI mode, it starts off with a slow 
+clock and after an initialisation phase it switches to a faster clock. You can lock 
+it in a slower clock if you think that is the problem. Look in sdmm.c for the
+disk_initialize method, and towards the end of it is this.
+
+           BitDelay=0;
+
+Comment it out , and recompile.
+
+
+- There's also the possibility that the interface to the SD card is not really working well at
  all on the stm32f407 board. In that case you can try placing the roms you want (max of 2 roms)
  into the roms directory in the build directory. Edit the Makefile and remove the '#' on the
  left of this line
