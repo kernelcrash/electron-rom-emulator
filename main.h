@@ -1,5 +1,8 @@
 #ifndef __MAIN_H
 #define __MAIN_H
-void asm_poller(void);
+
+#define MAIN_THREAD_ROM_SWAP_COMMAND    0x20000000   //b29
+#define MAIN_THREAD_COMMANDS_MASK	MAIN_THREAD_ROM_SWAP_COMMAND
+
 #endif
 

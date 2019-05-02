@@ -33,10 +33,11 @@
 ENTRY(Reset_Handler)
 
 /* Highest address of the user mode stack */
-_estack = 0x20020000;    /* end of RAM */
+ _estack = 0x20020000;     /* end of RAM */
+/* _estack = 0x10010000; */    /* end of CCM RAM */
 /* Generate a link error if heap and stack don't fit into RAM */
-_Min_Heap_Size = 0x200;;      /* required amount of heap  */
-_Min_Stack_Size = 0x400;; /* required amount of stack */
+_Min_Heap_Size = 0x0800;;      /* required amount of heap  */
+_Min_Stack_Size = 0x0800;;   /* required amount of stack */
 
 /* Specify the memory areas */
 MEMORY
@@ -44,6 +45,7 @@ MEMORY
 FLASH (rx)      : ORIGIN = 0x8000000, LENGTH = 1024K
 RAM (xrw)      : ORIGIN = 0x20000000, LENGTH = 128K
 CCMRAM (rw)      : ORIGIN = 0x10000000, LENGTH = 64K
+
 }
 
 /* Define output sections */
@@ -138,6 +140,7 @@ SECTIONS
   {
     . = ALIGN(4);
     _sccmram = .;       /* create a global symbol at ccmram start */
+    swram_low_base = .;
     *(.ccmram)
     *(.ccmram*)
     
@@ -168,6 +171,7 @@ SECTIONS
     . = ALIGN(4);
     PROVIDE ( end = . );
     PROVIDE ( _end = . );
+    PROVIDE ( __end__ = . );
     . = . + _Min_Heap_Size;
     . = . + _Min_Stack_Size;
     . = ALIGN(4);
