@@ -14,12 +14,12 @@ Most F407 pins are 5V tolerant. Some of these boards have a micro SD card slot, 
  can wire a micro SD socket in.
 - Emulates 4 ROM slots (slots 12, 13, 14 and 15) but they all act as sideways RAM slots
 - Loads 16KB rom files from an SD card on boot. You need a directory on your FAT32 sdcard like so:
-
+```
    boot/12/ESWMMFS.rom
    boot/13
    boot/14
    boot/15
-
+```
   ie. Put one rom file in the boot/12 directory, and it will be loaded into rom slot 12
  on boot. Put one rom in boot/13 and it will be loaded into slot 13 etc.
 
@@ -32,10 +32,11 @@ PAGE = E00, which is more compatible with a lot of games compared to the standar
  the boot directories (eg. boot/12, boot/13 etc) and then copy the appropriate roms into those 
  directories.
 
-
+```
       rom_base:
       .incbin "roms/ESWMMFS.rom"
       .incbin "roms/AP6v130ta.rom"
+```
 
 - Basically 
   - download the 16K rom files you want to repload (definitely get ESWMMFS.rom!)
@@ -79,16 +80,17 @@ Wiring
 (PE8)	A8     46	45	A7 (PE7)
 	GND    48	47	GND
 	+5V    50	49	+5V
+```
 
 - Some STM32F407 boards have an SD card slot and already wired in
   the 'standard way' for SDIO . Otherwise wire up the SD card as follows;
-
+```
    /CS    - PC11
    MOSI   - PD2
    SCK    - PC12
 
    MISO   - PC8
-
+```
 
 Technical
 =========
@@ -169,10 +171,10 @@ way the ISR does not need to load these from memory during the ISR. eg. register
 is used to store the base address for EXTI (used by lots of interrupt related activities).
 We are also often using the values 0 and 1, so two registers are effectively wasted as 
 constants for 0 and 1 (in my case s0 = 0 and s1 = 1).  eg.
-
+```
         vmov    r3,s3             // r3 = EXTI
         vstr    s1,[r3,PR]      // clear interrupt by writing 1 to it.
-
+```
 Compiling
 =========
 
@@ -184,9 +186,9 @@ You will need some roms. Generally you want at least the ESWMMFS.rom in the roms
 incbin lines in interrupt.S referring to the roms you want to preload.
 
 Do a 
-
+```
    make
-
+```
 Look at transfer.sh for how you might transfer it to your board.
 
 
@@ -217,12 +219,12 @@ There's also the possibility that the interface to the SD card is not really wor
  all on the stm32f407 board. In that case you can try placing the roms you want (max of 2 roms)
  into the roms directory in the build directory. Edit the Makefile and remove the '#' on the
  left of this line
-
+```
 	CFLAGS += -DPRELOAD_SOME_ROMS_FROM_FLASH_INSTEAD_OF_SDCARD
-
+```
 Also edit interrupt.S and search for rom_base: and list the two roms you want to preload
  underneath it.
-
+```
       rom_base:
       // be careful if you add roms and later delete them. The old ones might be still in the STM32 flash
       #ifdef PRELOAD_SOME_ROMS_FROM_FLASH_INSTEAD_OF_SDCARD
@@ -230,20 +232,18 @@ Also edit interrupt.S and search for rom_base: and list the two roms you want to
       .incbin "roms/blank.rom"
       //.incbin "roms/AP6v130ta.rom"
       #endif
-      
+```      
 Now try building again and flash it to your stm32f407 board. Now when the Electron boots it
 should grab the roms directly from the stm32f407 boards internal flash. If you put ESWMMFS.rom
 as the first one after rom_base: , then it will appear as rom 12. Another rom that is useful
 is the 16K AP6 rom from http://mdfs.net/Software/BBC/SROM/Plus1/ . That will give you a *ROMS
 command as well as various sideways ram load/save commands. I often put this as rom 13.
 
-
-
 - The flash accelerator had some problems in early stm32f4 chips. Find this line in main.c:
-
+```
     //FLASH->ACR = FLASH_ACR_PRFTEN | FLASH_ACR_ICEN |FLASH_ACR_DCEN |FLASH_ACR_LATENCY_5WS;
     FLASH->ACR =  FLASH_ACR_ICEN |FLASH_ACR_DCEN |FLASH_ACR_LATENCY_5WS;
-
+```
 The line with FLASH_ACR_PRFTEN turns on the flash prefetch feature which is generally a good 
 thing but might cause problems on some chips. You can try commenting one line and not the other to 
 turn it on and off.
