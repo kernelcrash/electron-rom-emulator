@@ -17,7 +17,7 @@ SRCS += stm32f4xx_syscfg.c misc.c stm32f4xx_gpio.c stm32f4xx_rcc.c stm32f4xx_usa
 #SRCS += stm32f4_discovery.c
 
 # Binaries will be generated with this name (.elf, .bin, .hex, etc)
-PROJ_NAME=electron-rom-emulator-with-irq
+PROJ_NAME=electron-rom-emulator
 
 #######################################################################################
 
