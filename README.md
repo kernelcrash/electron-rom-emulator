@@ -37,8 +37,6 @@ PAGE = E00, which is more compatible with a lot of games compared to the standar
       .incbin "roms/ESWMMFS.rom"
       .incbin "roms/AP6v130ta.rom"
 
-  A key advantage of using the Sideways RAM version of MMFS (ESWMMFS) is that you can load games that require PAGE = E00.
-
 - Basically 
   - download the 16K rom files you want to repload (definitely get ESWMMFS.rom!)
   - Add these into interrupt.S under rom_base
@@ -203,8 +201,11 @@ If you have trouble with the roms loading from SD card , check a few things
  - Format the partition with FAT32 . I am just using linux, and am not doing
  anything special (eg. sudo mkfs.vfat /dev/sd<driver_letter>1 )
  - Find a decent BEEB.MMB for the Electron on the stardot forums.
- - Copy the BEEB.MMB as the very first file you copy to your formatted SD card. MMFS has a minimal FAT layer, so I think I read that BEEB.MMB has to be one of the first 8 files written to the SD card (I could be wrong).
- - After you've copied the BEEB.MMB in, make the boot roms directories (eg. boot/12 , boot/13 etc) and copy some roms in. To keep it simple I would just copy ESWMMFS.rom into boot/12 and leave 
+ - Copy the BEEB.MMB as the very first file you copy to your formatted SD card. 
+MMFS has a minimal FAT layer, so I think I read that BEEB.MMB has to be one of
+ the first 8 files written to the SD card (I could be wrong).
+ - After you've copied the BEEB.MMB in, make the boot roms directories (eg. boot/12 ,
+ boot/13 etc) and copy some roms in. To keep it simple I would just copy ESWMMFS.rom into boot/12 and leave 
 the other slots empty. One thing to note is that a different FAT interface runs on the stm32f407
 board and it does not have the same limitations as MMFS (all you need to know is MMFS wants to 
 find BEEB.MMB. Any other files on the SD card are used directly by the stm32f407 board.
@@ -244,7 +245,7 @@ command as well as various sideways ram load/save commands. I often put this as 
     FLASH->ACR =  FLASH_ACR_ICEN |FLASH_ACR_DCEN |FLASH_ACR_LATENCY_5WS;
 
 The line with FLASH_ACR_PRFTEN turns on the flash prefetch feature which is generally a good 
-but might cause problems on some chips. You can try commenting one line and not the other to 
+thing but might cause problems on some chips. You can try commenting one line and not the other to 
 turn it on and off.
 
 
