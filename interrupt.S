@@ -38,6 +38,25 @@ reg_save_r11_s30	.req    s30
 	bx	lr
 .endm
 
+.macro databus_write_delay
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+	nop
+.endm
+
+.macro databus_read_extra_delay
+	nop
+	nop
+.endm
+
+
 /* *********************************** */
 	.syntax unified
 	.cpu cortex-m4
@@ -219,9 +238,9 @@ EXTI0_IRQHandler:
 #endif
 	
 	vmov	r12,reg_combo_s4		// r12 = combo bits
-	lsrs	r0,r12,#16		// Move top half word of r12 into lower half of r0
-	movt	r0,#0x5555		// So should be 55550020 in SDIO mode, 55550010 in GPIO mode
-	vmov	reg_dataout_moder_s7,r0
+	//lsrs	r0,r12,#16		// Move top half word of r12 into lower half of r0
+	//movt	r0,#0x5555		// So should be 55550020 in SDIO mode, 55550010 in GPIO mode
+	//vmov	reg_dataout_moder_s7,r0
 
 	vmov	r3,reg_exti_base_s3		// r3 = EXTI
 	vstr	reg_one_s1,[r3,PR]	// clear interrupt
@@ -284,6 +303,8 @@ upper_32k:
 // So the 2nd wfe is meant to wait for the -ve edge, but if you get a spurious edge at exactly the time these instructions execute, it can slip through without waiting
         wfe     // wait for -ve edge of theta0
 
+	databus_read_extra_delay
+
         str     r1,[r2, C_TO_D_OFFSET + MODER]  // MODER set to inputs
 
 #ifdef DEBUG_EXTI0_ROM_ACCESS
@@ -298,6 +319,8 @@ write_sideways_ram:
 #ifdef DEBUG_EXTI0_SWRAM_WRITE
         vstr     reg_zero_s0,[r11,ODR]
 #endif
+	databus_write_delay
+
 	ldr	r1,[r2,C_TO_D_OFFSET+IDR]     // GPIOD read databus
 	lsrs	r1,r1,#8
 	vmov	r3,reg_swram_base_s6
@@ -331,6 +354,7 @@ register_0xfe05:
 #endif
         tst     r1,#0x0002      // see if r/w is low
         bne     exit_EXTI0
+	databus_write_delay
         ldr     r0,[r2,C_TO_D_OFFSET+IDR] // GPIOD IDR
         lsrs    r0,r0,#8
 	bfi	r12,r0,#0,#4	// copy lowest 4 bits of r0 into r8 lowest 4 bits
@@ -350,6 +374,9 @@ register_0xfc0f:
 	ands	r3,r0,#0x0f		// get rom number based on the address bus
         tst     r1,#0x0002      // see if r/w is low
         bne     exit_EXTI0
+
+	databus_write_delay
+
         ldr     r0,[r2,C_TO_D_OFFSET+IDR] // GPIOD IDR
         lsrs    r0,r0,#8		// r0 has rom to swap to
 	bfi	r0,r3,#8,#4	// copy lowest 4 bits of r3 into r0 b11-b8
@@ -370,6 +397,7 @@ register_0xfc71:
 // MOSI is D0, SCK is D1 from the Electrons perspective. These come in on D8 and D9 for us.
 // MOSI needs to go out as PD2. SCK goes out as PC12 and we need to keep PC11 low for CS/
         movs    r3,#0
+	databus_write_delay
         ldr     r0,[r2,C_TO_D_OFFSET+IDR] // GPIOD IDR
         tst     r0,#0x0100  // PD8
 	ITE	NE
@@ -425,6 +453,8 @@ register_0xfc72:
         sev     // set the event register
         wfe     // clear the event register
         wfe     // wait for the positive edge of _MREQ
+
+	databus_read_extra_delay
 
         str     r1,[r2, C_TO_D_OFFSET + MODER]  // MODER set to inputs
 

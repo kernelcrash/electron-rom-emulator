@@ -499,6 +499,7 @@ int __attribute__((optimize("O0")))  main(void) {
 	//register uint32_t copy_combo_register asm("s4") __attribute__((unused)) = 0x00200000;
 	register unsigned char* copy_gpioa_base asm("s5") __attribute__((unused)) = (unsigned char*) GPIOA;
 	register volatile uint8_t* copy_swram_high_base asm("s6") __attribute__((unused)) = (volatile uint8_t*) &swram_high_base;
+	register uint32_t copy_dataout_moder asm("s7") __attribute__((unused)) = 0x55550010;
 	// Use some of the high fpu registers as a sort of stack. eg. save r11 to s30 on ISR entry, then put it back on ISR exit
 	register volatile uint8_t* fake_stack_r11 asm("s30") __attribute__((unused));
 
