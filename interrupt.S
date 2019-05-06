@@ -52,8 +52,14 @@ reg_save_r11_s30	.req    s30
 .endm
 
 .macro databus_read_extra_delay
-	nop
-	nop
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop
+        nop
 .endm
 
 
