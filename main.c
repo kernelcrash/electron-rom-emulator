@@ -367,8 +367,10 @@ void scan_and_load_roms() {
 	FIL	fil;
 #ifdef ROMS_ON_SECOND_PARTITION
         TCHAR root_directory[11] = "1:boot/";
+        TCHAR root_rom[15] = "1:rom";
 #else
         TCHAR root_directory[11] = "0:boot/";
+        TCHAR root_rom[15] = "0:rom";
 #endif
         TCHAR full_filename[64];
         DIR dir;
@@ -377,7 +379,7 @@ void scan_and_load_roms() {
         char *swram;
 
 	for (int highlow = 0;highlow <= 1 ; highlow++) {
-           if (highlow==0) { 
+           if (highlow==0) {
               swram = (char *) &swram_high_base;
            } else {
               //swram = (char *) &swram_low_base;
@@ -386,6 +388,8 @@ void scan_and_load_roms() {
     	   for (int i = 0; i<=3 ; i++) {
               if (highlow==0) {
 		 itoa_base10(i+12, &root_directory[7]);
+		 itoa_base10(i+12, &root_rom[5]);
+		 strcat(root_rom,".rom");
                  //root_directory[8] = (char) i + '2';   // 2, 3, 4, 5 etc to make 12,13,14,15
               } else {
                  root_directory[6] = (char) i + '4';   // 4,5,6,7
@@ -401,7 +405,7 @@ void scan_and_load_roms() {
 #endif
                    for (;;) {
                           res = f_readdir(&dir, &fno);                   /* Read a directory item */
-                          if (res != FR_OK || fno.fname[0] == 0) break;  /* Break on error or end of dir */
+			  if (res != FR_OK || fno.fname[0] == 0) break;  /* Break on error or end of dir */
                           strcpy(full_filename,root_directory);
                           strcat(full_filename,"/");
                           strcat(full_filename,fno.fname);
@@ -416,13 +420,26 @@ void scan_and_load_roms() {
                                 // The f_read will never write directly to CCMRAM
    	                        //res = f_read(&fil, temp_rom, 16384, &BytesRead);
                                 //memcpy(swram,temp_rom,16384);
-                             }   
+                             }
                              f_close(&fil);
                           }
                           break;   // only interested in the first file in the dir
                    }
                    f_closedir(&dir);
-              }
+              } else {
+		  if (res != FR_OK) {
+#ifdef ENABLE_SEMIHOSTING
+                       printf("Try to open %s %0x08x\n",root_rom,swram);
+#endif
+                	res = f_open(&fil, root_rom, FA_READ);
+			if (res == FR_OK) {
+				if (highlow==0) {
+                               		res = f_read(&fil, swram, 16384, &BytesRead);
+				}
+				f_close(&fil);
+			}
+		  }
+	      }
 	      swram+=0x4000;
            }
         }
