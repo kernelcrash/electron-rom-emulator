@@ -31,11 +31,6 @@ extern void initialise_monitor_handles(void);   /*rtt*/
 #endif
 
 FATFS fs32;
-// Allow for two disk partitions
-PARTITION VolToPart[FF_VOLUMES] = {
-    {0, 1},     /* "0:" ==> Physical drive 0, 1st partition */
-    {0, 2}     /* "1:" ==> Physical drive 0, 2nd partition */
-};
 
 
 
@@ -64,7 +59,8 @@ void enable_fpu_and_disable_lazy_stacking() {
     "  str r1, [r0]              \n" /* Write back the modified value to the FPCCR */
     "  dsb                       \n" /* wait for store to complete */
     "  isb"                          /* reset pipeline  */
-  );
+    :::"r0","r1"
+    );
 }
 
 // From some reddit thread on fast itoa
@@ -283,11 +279,20 @@ void config_gpio_portc(void) {
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
 	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
+#ifdef DISABLE_PULLUPS_FOR_SDCARD
+	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
+#else
 	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
-	//GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
+#endif
 	GPIO_Init(GPIOC, &GPIO_InitStructure);
 
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0 | GPIO_Pin_1 | GPIO_Pin_8;
+	// Also SD Card (so will inherit the pullup/nopull setting above
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_8;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;
+	GPIO_Init(GPIOC, &GPIO_InitStructure);
+
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0 | GPIO_Pin_1 ;
+	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;
 	GPIO_Init(GPIOC, &GPIO_InitStructure);
 
@@ -314,6 +319,11 @@ void config_gpio_data(void) {
 
 	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_2 ;
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
+#ifdef DISABLE_PULLUPS_FOR_SDCARD
+	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
+#else
+	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
+#endif
 	GPIO_Init(GPIOD, &GPIO_InitStructure);
 }
 
@@ -365,18 +375,16 @@ void config_backup_sram(void) {
 void scan_and_load_roms() {
 	FRESULT res;
 	FIL	fil;
-#ifdef ROMS_ON_SECOND_PARTITION
-        TCHAR root_directory[11] = "1:boot/";
-        TCHAR root_rom[15] = "1:rom";
-#else
-        TCHAR root_directory[11] = "0:boot/";
-        TCHAR root_rom[15] = "0:rom";
-#endif
+        TCHAR root_directory[11] = "/boot/";
+        TCHAR root_rom[15] = "/rom";
+
         TCHAR full_filename[64];
         DIR dir;
         static FILINFO fno;
 	UINT BytesRead;
         char *swram;
+	int  root_directory_base_length= strlen(root_directory);
+	int  root_rom_base_length= strlen(root_rom);
 
 	for (int highlow = 0;highlow <= 1 ; highlow++) {
            if (highlow==0) {
@@ -387,8 +395,8 @@ void scan_and_load_roms() {
            }
     	   for (int i = 0; i<=3 ; i++) {
               if (highlow==0) {
-		 itoa_base10(i+12, &root_directory[7]);
-		 itoa_base10(i+12, &root_rom[5]);
+		 itoa_base10(i+12, &root_directory[root_directory_base_length]);
+		 itoa_base10(i+12, &root_rom[root_rom_base_length]);
 		 strcat(root_rom,".rom");
                  //root_directory[8] = (char) i + '2';   // 2, 3, 4, 5 etc to make 12,13,14,15
               } else {
@@ -449,16 +457,13 @@ void scan_and_load_roms() {
 void load_rom(uint8_t slot, uint8_t rom_number_on_sdcard) {
 	FRESULT res;
 	FIL	fil;
-#ifdef ROMS_ON_SECOND_PARTITION
-        TCHAR root_directory[18] = "1:roms/";
-#else
-        TCHAR root_directory[18] = "0:roms/";
-#endif
+        TCHAR root_directory[18] = "/roms/";
         TCHAR full_filename[64];
         DIR dir;
         static FILINFO fno;
 	UINT BytesRead;
         char *swram;
+	int root_directory_base_length = strlen(root_directory);
 
 
 
@@ -469,7 +474,7 @@ void load_rom(uint8_t slot, uint8_t rom_number_on_sdcard) {
 	if (slot < 12 || slot > 15) {
 		return;
 	}
-	itoa_base10(rom_number_on_sdcard, &root_directory[7]);
+	itoa_base10(rom_number_on_sdcard, &root_directory[root_directory_base_length]);
 
         res = f_opendir(&dir, root_directory);
         if (res == FR_OK) {
@@ -481,12 +486,16 @@ void load_rom(uint8_t slot, uint8_t rom_number_on_sdcard) {
                           strcat(full_filename,fno.fname);
                           res = f_open(&fil, full_filename, FA_READ);
                           if (res == FR_OK) {
-   	                     swram += ((slot-12)*0x4000);
                              //printf(">>>opened %s 0x%08x\n",full_filename, swram);
+   	                     swram += ((slot-12)<<14);
    	                     res = f_read(&fil, swram, 16384, &BytesRead);
 			     if (res == FR_OK) {
+                                //printf(">>>read %s 0x%08x\n",full_filename, swram);
                                 f_close(&fil);
-		             } 
+		             } else {
+                                //printf(">>>not ok 0x%08x\n",BytesRead);
+
+			     }
 			  }
                           break;   // only interested in the first file in the dir
                    }
@@ -494,12 +503,20 @@ void load_rom(uint8_t slot, uint8_t rom_number_on_sdcard) {
          }
 }
 
+void	clear_rom_area(uint32_t *p) {
+	for (int i = 0 ; i < 0x4000 ; i+= 0x1000) {
+		p[i]=0; p[i+1]=0;   // clear 8 bytes at start of each rom
+	}
+
+}
 // probably dont need to turn the optimiser off, but it kept on annoying me at the time
 int __attribute__((optimize("O0")))  main(void) {
 	FRESULT res;
 
 	// FPU related
 	enable_fpu_and_disable_lazy_stacking();
+
+	clear_rom_area((uint32_t *) &swram_high_base);
 
 	// Assign some of the FPU registers to be actually used as integer 'fast access' during the ISR
 	// register types dont really matter, so long as we get the assignment to work.
@@ -513,9 +530,9 @@ int __attribute__((optimize("O0")))  main(void) {
 	//   b15-b8  - Current state of PD2. Either 04 for PD2=1, or 00 for PD2=0
 	//   b7-b0   - Current ROM slot register (updated when a 6502 write to FE05 occurs)
 	register uint32_t copy_combo_register asm("s4") __attribute__((unused)) = 0x00100000;
-	//register uint32_t copy_combo_register asm("s4") __attribute__((unused)) = 0x00200000;
 	register unsigned char* copy_gpioa_base asm("s5") __attribute__((unused)) = (unsigned char*) GPIOA;
 	register volatile uint8_t* copy_swram_high_base asm("s6") __attribute__((unused)) = (volatile uint8_t*) &swram_high_base;
+	// 5555 = d15-d8 outputs and 0010 is d2 out
 	register uint32_t copy_dataout_moder asm("s7") __attribute__((unused)) = 0x55550010;
 	// Use some of the high fpu registers as a sort of stack. eg. save r11 to s30 on ISR entry, then put it back on ISR exit
 	register volatile uint8_t* fake_stack_r11 asm("s30") __attribute__((unused));
@@ -563,11 +580,8 @@ int __attribute__((optimize("O0")))  main(void) {
 // dir at compile time and reference them in interrupt.S
         memset(&fs32, 0, sizeof(FATFS));
 	
-#ifdef ROMS_ON_SECOND_PARTITION
-        res = f_mount(&fs32, "1:",1);
-#else
-        res = f_mount(&fs32, "0:",1);
-#endif
+	// Change to lazy mounting
+        res = f_mount(&fs32, "",0);
 
 
 	if (res != FR_OK) {

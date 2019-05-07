@@ -33,7 +33,7 @@
 #include "stm32f4xx.h"
 
 // Need to still induce a delay for bitbanging in fast mode
-#define NOPS __asm volatile ( "nop \n nop \n nop \n nop")
+#define NOPS __asm volatile ( "nop \n nop\n nop \n nop")
 
 
 
@@ -58,8 +58,10 @@
 #define DO			(GPIOC->IDR &	0x0100)	/* Test for MMC DO ('H':true, 'L':false) */
 
 //#define DI_INIT()	DDRB  |= 0x02	/* Initialize port for MMC DI as output */
-#define DI_H()		GPIOD->BSRRL = 1<<2	/* Set MMC DI "high" */
-#define DI_L()		GPIOD->BSRRH = 1<<2	/* Set MMC DI "low" */
+// This weirdness with s4 is because the ISR uses s4 to hold a few things including the state of PD2(DI) . When we send PD2 high, we also need to set the bit
+// in s4 so that the ISR will also set PD2 if it happens to do a 6502 read (ie. a write from the ISR's perspective). 
+#define DI_H()		__asm volatile ( "vmov      r0,s4 \n orr r0,#0x0400 \n vmov s4,r0 ":::"r0"); GPIOD->BSRRL = 1<<2	/* Set MMC DI "high" */
+#define DI_L()		__asm volatile ( "vmov       r0,s4 \n bfc r0,#10,#1 \n vmov s4,r0 ":::"r0"); GPIOD->BSRRH = 1<<2	/* Set MMC DI "low" */
 
 //#define CK_INIT()	DDRB  |= 0x04	/* Initialize port for MMC SCLK as output */
 #define CK_H()		GPIOC->BSRRL = 1<<12	/* Set MMC SCLK "high" */
@@ -133,46 +135,45 @@ void xmit_mmc (
 )
 {
 	BYTE d;
-
 	if (!BitDelay) {
 		do {
 			d = *buff++;	/* Get a byte to be sent */
-			if (d & 0x80) DI_H(); else DI_L();	/* bit7 */
+			if (d & 0x80) { DI_H(); } else { DI_L(); }	/* bit7 */
 			NOPS; CK_H(); NOPS ; CK_L();
-			if (d & 0x40) DI_H(); else DI_L();	/* bit6 */
+			if (d & 0x40) { DI_H(); } else { DI_L(); }	/* bit6 */
 			NOPS; CK_H(); NOPS ; CK_L();
-			if (d & 0x20) DI_H(); else DI_L();	/* bit5 */
+			if (d & 0x20) { DI_H(); } else { DI_L(); }	/* bit5 */
 			NOPS; CK_H(); NOPS ; CK_L();
-			if (d & 0x10) DI_H(); else DI_L();	/* bit4 */
+			if (d & 0x10) { DI_H(); } else { DI_L(); }	/* bit4 */
 			NOPS; CK_H(); NOPS ; CK_L();
-			if (d & 0x08) DI_H(); else DI_L();	/* bit3 */
+			if (d & 0x08) { DI_H(); } else { DI_L(); }	/* bit3 */
 			NOPS; CK_H(); NOPS ; CK_L();
-			if (d & 0x04) DI_H(); else DI_L();	/* bit2 */
+			if (d & 0x04) { DI_H(); } else { DI_L(); }	/* bit2 */
 			NOPS; CK_H(); NOPS ; CK_L();
-			if (d & 0x02) DI_H(); else DI_L();	/* bit1 */
+			if (d & 0x02) { DI_H(); } else { DI_L(); }	/* bit1 */
 			NOPS; CK_H(); NOPS ; CK_L();
-			if (d & 0x01) DI_H(); else DI_L();	/* bit0 */
+			if (d & 0x01) { DI_H(); } else { DI_L(); }	/* bit0 */
 			NOPS; CK_H(); NOPS ; CK_L();
 		} while (--bc);
 	} else {
 	
 		do {
 			d = *buff++;	/* Get a byte to be sent */
-			if (d & 0x80) DI_H(); else DI_L();	/* bit7 */
+			if (d & 0x80) { DI_H(); } else { DI_L(); }	/* bit7 */
 			dly_us(BitDelay); CK_H(); dly_us(BitDelay); CK_L();
-			if (d & 0x40) DI_H(); else DI_L();	/* bit6 */
+			if (d & 0x40) { DI_H(); } else { DI_L(); }	/* bit6 */
 			dly_us(BitDelay); CK_H(); dly_us(BitDelay); CK_L();
-			if (d & 0x20) DI_H(); else DI_L();	/* bit5 */
+			if (d & 0x20) { DI_H(); } else { DI_L(); }	/* bit5 */
 			dly_us(BitDelay); CK_H(); dly_us(BitDelay); CK_L();
-			if (d & 0x10) DI_H(); else DI_L();	/* bit4 */
+			if (d & 0x10) { DI_H(); } else { DI_L(); }	/* bit4 */
 			dly_us(BitDelay); CK_H(); dly_us(BitDelay); CK_L();
-			if (d & 0x08) DI_H(); else DI_L();	/* bit3 */
+			if (d & 0x08) { DI_H(); } else { DI_L(); }	/* bit3 */
 			dly_us(BitDelay); CK_H(); dly_us(BitDelay); CK_L();
-			if (d & 0x04) DI_H(); else DI_L();	/* bit2 */
+			if (d & 0x04) { DI_H(); } else { DI_L(); }	/* bit2 */
 			dly_us(BitDelay); CK_H(); dly_us(BitDelay); CK_L();
-			if (d & 0x02) DI_H(); else DI_L();	/* bit1 */
+			if (d & 0x02) { DI_H(); } else { DI_L(); }	/* bit1 */
 			dly_us(BitDelay); CK_H(); dly_us(BitDelay); CK_L();
-			if (d & 0x01) DI_H(); else DI_L();	/* bit0 */
+			if (d & 0x01) { DI_H(); } else { DI_L(); }	/* bit0 */
 			dly_us(BitDelay); CK_H(); dly_us(BitDelay); CK_L();
 		} while (--bc);
 	}
@@ -192,7 +193,6 @@ void rcvr_mmc (
 )
 {
 	BYTE r;
-
 	DI_H();	/* Send 0xFF */
 
 	if (!BitDelay) {
@@ -376,6 +376,7 @@ BYTE send_cmd (		/* Returns command response (bit7==1:Send failed)*/
 )
 {
 	BYTE n, d, buf[6];
+
 
 
 	if (cmd & 0x80) {	/* ACMD<n> is the command sequense of CMD55-CMD<n> */
