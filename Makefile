@@ -58,7 +58,6 @@ CFLAGS += -ffixed-s30
 #CFLAGS += -DDEBUG_FC72
 # If you board has an SD card slot with pullups, then set DISABLE_PULLUPS_FOR_SDCARD
 #CFLAGS += -DDISABLE_PULLUPS_FOR_SDCARD
-#CFLAGS += -DPRELOAD_SOME_ROMS_FROM_FLASH_INSTEAD_OF_SDCARD
 #CFLAGS += -DENABLE_SEMIHOSTING
 
 # Include files from STM libraries

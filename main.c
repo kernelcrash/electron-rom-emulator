@@ -22,7 +22,8 @@ GPIO_InitTypeDef  GPIO_InitStructure;
 // Must be volatile to prevent optimiser doing stuff
 extern volatile uint32_t main_thread_command;
 extern volatile uint32_t main_thread_data;
-extern volatile uint8_t *rom_base;
+extern volatile uint8_t *rom_base_start;
+extern volatile uint8_t *rom_base_end;
 extern volatile uint8_t *swram_low_base;
 extern volatile uint8_t *swram_high_base;
 
@@ -108,22 +109,45 @@ void delay_ms(const uint16_t ms)
    }
 }
 
-#ifdef PRELOAD_SOME_ROMS_FROM_FLASH_INSTEAD_OF_SDCARD
-void copy_rom_to_ram(uint8_t *from, uint8_t *to, uint8_t rom_count) {
-   uint32_t *p, *q;
-   int count;
+void copy_rom_to_ram(uint8_t *src_start, uint8_t *src_end, uint8_t *to) {
+   uint32_t *p, *end, *dest;
+   //
    // copy in 4 byte chunks
-   p = (uint32_t *)from;
-   q = (uint32_t *)to;
+   p = (uint32_t *)src_start;
+   end = (uint32_t *)src_end;
+   dest = (uint32_t *)to;
 
-   for (count=0; count< rom_count; count++) {
-      for (int i=0; i< 0x1000;i++) {
-         *q++ = *p++;   
-      }
+#ifdef ENABLE_SEMIHOSTING
+      printf("%s: request (%08x to %08x)\n", __FUNCTION__,p,end);
+#endif
+
+   if (p == end) {
+#ifdef ENABLE_SEMIHOSTING
+      printf("%s: No roms in flash\n", __FUNCTION__);
+#endif
+	   return;
+   }
+   if ((end - p) > 0x10000) {
+
+#ifdef ENABLE_SEMIHOSTING
+      printf("%s: roms exceed limit (%08x to %08x). Truncate to limit\n", __FUNCTION__,p,end);
+#endif
+      end = (p + 0x10000);
+#ifdef ENABLE_SEMIHOSTING
+      printf("%s: new limit (%08x to %08x)\n", __FUNCTION__,p,end);
+#endif
    }
 
-}
+   int count=0;
+   while (p <end) {
+      *dest++ = *p++;
+      count++;
+   }
+#ifdef ENABLE_SEMIHOSTING
+   printf("%s: copied %08x longs\n", __FUNCTION__,count);
 #endif
+
+}
 
 
 enum sysclk_freq {
@@ -538,9 +562,10 @@ int __attribute__((optimize("O0")))  main(void) {
 	register volatile uint8_t* fake_stack_r11 asm("s30") __attribute__((unused));
 
 	//__disable_irq();
-#ifdef PRELOAD_SOME_ROMS_FROM_FLASH_INSTEAD_OF_SDCARD
-	copy_rom_to_ram((uint8_t*) &rom_base, (uint8_t*) &swram_high_base,2);
-#endif
+	//
+	// Always look for roms in interrupt.S between the rom_base_start and rom_base_end labels and preload them into the sideways ram buffer.
+	// If you don't define and roms in interrupt.S then roms will get loaded from SD card later on.
+	copy_rom_to_ram((uint8_t*) &rom_base_start, (uint8_t*) &rom_base_end, (uint8_t*) &swram_high_base);
 
 #ifdef ENABLE_SEMIHOSTING
         initialise_monitor_handles();   /*rtt*/
@@ -573,14 +598,9 @@ int __attribute__((optimize("O0")))  main(void) {
 
 	SysTick->CTRL  = 0;
 
-// Mount the SD card and look for roms to preload
-// if you set PRELOAD_SOME_ROMS_FROM_FLASH_INSTEAD_OF_SDCARD in the Makefile
-// then the SD card is still mouned, but it wont try to preload any roms from
-// the SD card. Instead you need to put some rom files into the roms
-// dir at compile time and reference them in interrupt.S
         memset(&fs32, 0, sizeof(FATFS));
 	
-	// Change to lazy mounting
+	// Change to lazy mounting the SD card
         res = f_mount(&fs32, "",0);
 
 
@@ -596,11 +616,13 @@ int __attribute__((optimize("O0")))  main(void) {
 #endif
 	}
 
-#ifndef PRELOAD_SOME_ROMS_FROM_FLASH_INSTEAD_OF_SDCARD
+	// Look for ROM images on the SD card and load them
 	scan_and_load_roms();
-#endif
 	//f_mount(0, "1:", 1); // unmount
 
+#ifdef ENABLE_SEMIHOSTING
+	printf("Just before enabling the PC0 ISR\n");
+#endif
 	config_PC0_int();
 
 	while(1) {

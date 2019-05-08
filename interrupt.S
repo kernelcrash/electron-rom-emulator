@@ -71,22 +71,23 @@ reg_save_r11_s30	.req    s30
 	.thumb
 
 	.global EXTI0_IRQHandler
-	.global rom_base
+	.global rom_base_start
+	.global rom_base_end
 	.global swram_low_base			// swram 4,5,6,7  - for future.
 	.global swram_high_base			// swram 12,13,14,15
 	.global main_thread_command
 	.global main_thread_data
 
 .section .rodata
-// Can put up to four 16K roms here which will get mapped to rom 12, 13, 14 and 15
 
-rom_base:
-// be careful if you add roms and later delete them. The old ones might be still in the STM32 flash
-#ifdef PRELOAD_SOME_ROMS_FROM_FLASH_INSTEAD_OF_SDCARD
-.incbin "roms/ESWMMFS.rom"
-.incbin "roms/blank.rom"
+rom_base_start:
+// put up to 4 16K roms here between rom_base_start and rom_base_end.
+// Each rom must be exactly 16384 bytes long
+//.incbin "roms/ESWMMFS.rom"
 //.incbin "roms/AP6v130ta.rom"
-#endif
+//.incbin "roms/blank.rom"
+rom_base_end:
+
 
 .section ccmram
 	// swram_low_base consumes the entire 64K CCMRAM . Look in stm32_flash.ld for where the global symbol is defined
