@@ -12,11 +12,15 @@ Overview
 - Uses a cheap STM32F407 board directly into the expansion connector of the Electron. 
 Most F407 pins are 5V tolerant. Some of these boards have a micro SD card slot, or you
  can wire a micro SD socket in.
-- Emulates 4 ROM slots (slots 12, 13, 14 and 15) but they all act as sideways RAM slots
+- Emulates 8 ROM slots (slots 4, 5, 6, 7 and 12, 13, 14 and 15) but they all act as sideways RAM slots
 - Can load rom files directly from flash on the stm32f407. This requires you to 'compile
 the roms in'. See Troubleshooting further down for how to do this.
 - Loads 16KB rom files from an SD card on boot. You need a directory on your FAT32 sdcard like so:
 ```
+   boot/4
+   boot/5
+   boot/6
+   boot/7
    boot/12/ESWMMFS.rom
    boot/13
    boot/14
@@ -49,10 +53,10 @@ into rom slot 15. 15 is 'F' in hex, so type this at the Electron prompt
    ?&FC0F = 1
 ```
 That tells it to take the rom in 'roms/1' and insert it into slot 15 (ie. 'F'). If I wanted
-to put Viewsheet in I would go '?&FC0F = 2' . If I wanted Hopper in slot 14 (ie. 'E' ) 
+to put Viewsheet in I would go '?&FC0F = 2' . If I wanted Hopper in slot 4 (ie. '4' ) 
 instead then I would go :
 ```
-   ?&FC0E = 1
+   ?&FC04 = 1
 ```
 After you insert a ROM like this, you can ctrl-break to reboot the Electron, and hopefully
 you should be able to interact with the ROM. 
@@ -60,8 +64,13 @@ you should be able to interact with the ROM.
 This interface is effectively a proof of concept for simple communication between the 
 interupt and a main outer loop that runs on the stm32f4 board.
 
-Currently there are four memory addresses that correspond to the 4 rom slots;
+Currently there are eight memory addresses that correspond to the 8 rom slots;
 ```
+   &FC04   - rom slot 4
+   &FC05   - rom slot 5
+   &FC06   - rom slot 6
+   &FC07   - rom slot 7
+
    &FC0C   - rom slot 12
    &FC0D   - rom slot 13
    &FC0E   - rom slot 14
@@ -253,13 +262,14 @@ Comment it out , and recompile.
 - The current code has two ways of loading ROMS as the system boots;
 
    - You reference one or more ROMS in interrupt.S
-   - You put some ROMS inthe SD card under boot/12, boot/13, boot/14 or boot/15
+   - You put some ROMS inthe SD card under boot/4, boot/5, boot/6, boot/7, boot/12, boot/13, boot/14 or boot/15
 
 Both methods are attempted on boot in the order shown above. So if you defined two
 ROMs in interrupt.S, they would be loaded into slots 12 and 13. But it you also put
 a ROM in boot/12 on the SD card, then slot 12 would be overridden with what you had
 on the SD card. Similarly slot 13 would be overridden in you had a ROM in boot/13 on
-the SD card and so on.
+the SD card and so on. NOTE: Currently it only loads up to 4 roms from flash into 
+the slots 12, 13, 14, 15. It doesn't try to load into slots 4, 5, 6, 7.
 
 To use preloading from flash, place the roms paths as incbin lines between the 
 rom_base_start and rom_base_end labels in interrupt.S like the example below. You 

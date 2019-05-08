@@ -3,10 +3,10 @@ branchtable:
 	.short     ((register_unused - branchtable)/2) /* 0xfc01 */
 	.short     ((register_unused - branchtable)/2) /* 0xfc02 */
 	.short     ((register_unused - branchtable)/2) /* 0xfc03 */
-	.short     ((register_unused - branchtable)/2) /* 0xfc04 */
-	.short     ((register_unused - branchtable)/2) /* 0xfc05 */
-	.short     ((register_unused - branchtable)/2) /* 0xfc06 */
-	.short     ((register_unused - branchtable)/2) /* 0xfc07 */
+	.short     ((register_0xfc04 - branchtable)/2) /* 0xfc04 */
+	.short     ((register_0xfc05 - branchtable)/2) /* 0xfc05 */
+	.short     ((register_0xfc06 - branchtable)/2) /* 0xfc06 */
+	.short     ((register_0xfc07 - branchtable)/2) /* 0xfc07 */
 	.short     ((register_unused - branchtable)/2) /* 0xfc08 */
 	.short     ((register_unused - branchtable)/2) /* 0xfc09 */
 	.short     ((register_unused - branchtable)/2) /* 0xfc0a */

@@ -11,13 +11,6 @@
 GPIO_InitTypeDef  GPIO_InitStructure;
 
 
-//register unsigned char* gpioa_base asm("r11");
-//register unsigned char* exti_base asm("r10");
-//  r8
-//   bits 7-0 is the rom_bank (actually the lower 4 bits of that)
-//   bits 15-8 are the pd2 status (either 0x00 or 0x04)
-//register uint32_t rom_bank_pd2_state asm("r8");
-//register unsigned char* gpioc_base asm("r6");
 
 // Must be volatile to prevent optimiser doing stuff
 extern volatile uint32_t main_thread_command;
@@ -32,6 +25,7 @@ extern void initialise_monitor_handles(void);   /*rtt*/
 #endif
 
 FATFS fs32;
+char temp_rom[16384];
 
 
 
@@ -121,7 +115,7 @@ void copy_rom_to_ram(uint8_t *src_start, uint8_t *src_end, uint8_t *to) {
       printf("%s: request (%08x to %08x)\n", __FUNCTION__,p,end);
 #endif
 
-   if (p == end) {
+   if (p >= end) {
 #ifdef ENABLE_SEMIHOSTING
       printf("%s: No roms in flash\n", __FUNCTION__);
 #endif
@@ -407,6 +401,7 @@ void scan_and_load_roms() {
         static FILINFO fno;
 	UINT BytesRead;
         char *swram;
+	int rom_offset;
 	int  root_directory_base_length= strlen(root_directory);
 	int  root_rom_base_length= strlen(root_rom);
 
@@ -414,19 +409,17 @@ void scan_and_load_roms() {
            if (highlow==0) {
               swram = (char *) &swram_high_base;
            } else {
-              //swram = (char *) &swram_low_base;
-	      break;
+              swram = (char *) &swram_low_base;
            }
     	   for (int i = 0; i<=3 ; i++) {
               if (highlow==0) {
-		 itoa_base10(i+12, &root_directory[root_directory_base_length]);
-		 itoa_base10(i+12, &root_rom[root_rom_base_length]);
-		 strcat(root_rom,".rom");
-                 //root_directory[8] = (char) i + '2';   // 2, 3, 4, 5 etc to make 12,13,14,15
+	         rom_offset=12;
               } else {
-                 root_directory[6] = (char) i + '4';   // 4,5,6,7
-                 root_directory[7] = 0x00;
+                 rom_offset=4;
               }
+              itoa_base10(i+rom_offset, &root_directory[root_directory_base_length]);
+              itoa_base10(i+rom_offset, &root_rom[root_rom_base_length]);
+              strcat(root_rom,".rom");
 #ifdef ENABLE_SEMIHOSTING
 	      printf("about to open %s\n",root_directory);
 #endif
@@ -450,8 +443,8 @@ void scan_and_load_roms() {
    	                        res = f_read(&fil, swram, 16384, &BytesRead);
                              } else {
                                 // The f_read will never write directly to CCMRAM
-   	                        //res = f_read(&fil, temp_rom, 16384, &BytesRead);
-                                //memcpy(swram,temp_rom,16384);
+   	                        res = f_read(&fil, temp_rom, 16384, &BytesRead);
+                                memcpy(swram,temp_rom,16384);
                              }
                              f_close(&fil);
                           }
@@ -488,19 +481,28 @@ void load_rom(uint8_t slot, uint8_t rom_number_on_sdcard) {
 	UINT BytesRead;
         char *swram;
 	int root_directory_base_length = strlen(root_directory);
+	int highslot;
 
 
 
 
-        swram = (char *) &swram_high_base;
 
-	// only handle slots 12 to 15
-	if (slot < 12 || slot > 15) {
+	// only handle slots 4 to 7 and 12 to 15
+	if (slot >=12 && slot <=15) {
+        	swram = (char *) &swram_high_base;
+		highslot=1;
+	} else if (slot >=4 && slot <=7) {
+        	swram = (char *) &swram_low_base;
+		highslot=0;
+	} else {
 		return;
 	}
+
+
 	itoa_base10(rom_number_on_sdcard, &root_directory[root_directory_base_length]);
 
         res = f_opendir(&dir, root_directory);
+	
         if (res == FR_OK) {
         	for (;;) {
                           res = f_readdir(&dir, &fno);                   /* Read a directory item */
@@ -511,15 +513,18 @@ void load_rom(uint8_t slot, uint8_t rom_number_on_sdcard) {
                           res = f_open(&fil, full_filename, FA_READ);
                           if (res == FR_OK) {
                              //printf(">>>opened %s 0x%08x\n",full_filename, swram);
-   	                     swram += ((slot-12)<<14);
-   	                     res = f_read(&fil, swram, 16384, &BytesRead);
-			     if (res == FR_OK) {
-                                //printf(">>>read %s 0x%08x\n",full_filename, swram);
-                                f_close(&fil);
-		             } else {
-                                //printf(">>>not ok 0x%08x\n",BytesRead);
+			     if (highslot) {
+   	                        swram += ((slot-12)<<14);
+   	                        res = f_read(&fil, swram, 16384, &BytesRead);
+                             } else {
+   	                        swram += ((slot-4)<<14);
+   	                        res = f_read(&fil, temp_rom, 16384, &BytesRead);
+                                memcpy(swram,temp_rom,16384);
+                             }
 
-			     }
+			     if (res == FR_OK) {
+                                f_close(&fil);
+		             } 
 			  }
                           break;   // only interested in the first file in the dir
                    }
@@ -541,6 +546,7 @@ int __attribute__((optimize("O0")))  main(void) {
 	enable_fpu_and_disable_lazy_stacking();
 
 	clear_rom_area((uint32_t *) &swram_high_base);
+	clear_rom_area((uint32_t *) &swram_low_base);
 
 	// Assign some of the FPU registers to be actually used as integer 'fast access' during the ISR
 	// register types dont really matter, so long as we get the assignment to work.
@@ -556,8 +562,9 @@ int __attribute__((optimize("O0")))  main(void) {
 	register uint32_t copy_combo_register asm("s4") __attribute__((unused)) = 0x00100000;
 	register unsigned char* copy_gpioa_base asm("s5") __attribute__((unused)) = (unsigned char*) GPIOA;
 	register volatile uint8_t* copy_swram_high_base asm("s6") __attribute__((unused)) = (volatile uint8_t*) &swram_high_base;
+	register volatile uint8_t* copy_swram_low_base asm("s7") __attribute__((unused)) = (volatile uint8_t*) &swram_low_base;
 	// 5555 = d15-d8 outputs and 0010 is d2 out
-	register uint32_t copy_dataout_moder asm("s7") __attribute__((unused)) = 0x55550010;
+	register uint32_t copy_dataout_moder asm("s8") __attribute__((unused)) = 0x55550010;
 	// Use some of the high fpu registers as a sort of stack. eg. save r11 to s30 on ISR entry, then put it back on ISR exit
 	register volatile uint8_t* fake_stack_r11 asm("s30") __attribute__((unused));
 

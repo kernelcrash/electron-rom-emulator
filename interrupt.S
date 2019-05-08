@@ -8,8 +8,9 @@ reg_gpioc_base_s2	.req    s2
 reg_exti_base_s3	.req    s3
 reg_combo_s4		.req    s4
 reg_gpioa_base_s5	.req    s5
-reg_swram_base_s6	.req    s6
-reg_dataout_moder_s7	.req    s7
+reg_swram_high_base_s6	.req    s6
+reg_swram_low_base_s7	.req    s7
+reg_dataout_moder_s8	.req    s8
 reg_save_r11_s30	.req    s30
 
 
@@ -276,9 +277,12 @@ upper_32k:
 	bmi	process_registers		// A15 = 1 and A14 = 1
 
 	lsls	r3,r12,#29	// b3 -> Carry, b2 -> pl/mi
-	bcc	exit_EXTI0	// ROMS 0,1,2,3,4,5,6,7
-	bpl	exit_EXTI0      // ROMS 8,9,10,11
-	// should be ROM 12,13,14,15
+	bpl	exit_EXTI0      // ROMS 0,1,2,3 and 8,9,10,11
+	// should be ROM 4,5,6,7 or 12,13,14,15
+	ITE	CC
+	vmovcc	r3,reg_swram_low_base_s7
+	vmovcs	r3,reg_swram_high_base_s6
+
         bfi     r0,r12,#14,#2
 	tst	r1,#0x0002
         //beq     exit_EXTI0	// should be to write_sdram
@@ -289,11 +293,10 @@ upper_32k:
 
 	// r1 should have port c in it, so upper 16 bits should be zero
 	lsrs	r1,r12,#8	// Move pd2 bits into bottom 8 bits
-	vmov	r3,reg_swram_base_s6
 	ldrb	r3,[r3,r0]	// get byte from rom in lower 8 bits
 	bfi	r1,r3,#8,#8	//Copy bottom 8 bits of r3 into b15-b8 of r1
 
-	vmov	r0,reg_dataout_moder_s7
+	vmov	r0,reg_dataout_moder_s8
         str     r1,[r2, C_TO_D_OFFSET + ODR] // GPIOD ODR
         str     r0,[r2, C_TO_D_OFFSET + MODER]  // MODER set to outputs
 
@@ -330,7 +333,6 @@ write_sideways_ram:
 
 	ldr	r1,[r2,C_TO_D_OFFSET+IDR]     // GPIOD read databus
 	lsrs	r1,r1,#8
-	vmov	r3,reg_swram_base_s6
 	strb	r1,[r3,r0]
 
 	unrolled_exit_EXTI0
@@ -374,6 +376,10 @@ register_0xfe05:
         //b       exit_EXTI0
 
 // ROM swap control ports
+register_0xfc04:
+register_0xfc05:
+register_0xfc06:
+register_0xfc07:
 register_0xfc0c:
 register_0xfc0d:
 register_0xfc0e:
@@ -443,7 +449,7 @@ register_0xfc72:
         lsls    r1,r1,#7
 	lsrs	r0,r12,#8	// get PD2 state into lower 8 bits
         orr     r1,r1,r0   // add in PD2
-	vmov	r0,s7
+	vmov	r0,reg_dataout_moder_s8
         str     r1,[r2,C_TO_D_OFFSET+ODR] // GPIOD ODR
         str     r0,[r2, C_TO_D_OFFSET+MODER]  // MODER set to outputs
         //movs    r1,#1

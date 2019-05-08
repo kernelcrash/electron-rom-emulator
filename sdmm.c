@@ -35,6 +35,7 @@
 // Need to still induce a delay for bitbanging in fast mode
 #define NOPS __asm volatile ( "nop \n nop\n nop \n nop")
 
+uint32_t	portc_state;
 
 
 /*-------------------------------------------------------------------------*/
@@ -60,16 +61,22 @@
 //#define DI_INIT()	DDRB  |= 0x02	/* Initialize port for MMC DI as output */
 // This weirdness with s4 is because the ISR uses s4 to hold a few things including the state of PD2(DI) . When we send PD2 high, we also need to set the bit
 // in s4 so that the ISR will also set PD2 if it happens to do a 6502 read (ie. a write from the ISR's perspective). 
-#define DI_H()		__asm volatile ( "vmov      r0,s4 \n orr r0,#0x0400 \n vmov s4,r0 ":::"r0"); GPIOD->BSRRL = 1<<2	/* Set MMC DI "high" */
-#define DI_L()		__asm volatile ( "vmov       r0,s4 \n bfc r0,#10,#1 \n vmov s4,r0 ":::"r0"); GPIOD->BSRRH = 1<<2	/* Set MMC DI "low" */
+//#define DI_H()		__asm volatile ( "vmov      r3,s4 \n orr r3,#0x0400 \n vmov s4,r3 ":::"r3"); GPIOD->BSRRL = 1<<2	/* Set MMC DI "high" */
+//#define DI_L()		__asm volatile ( "vmov       r3,s4 \n bfc r3,#10,#1 \n vmov s4,r3 ":::"r3"); GPIOD->BSRRH = 1<<2	/* Set MMC DI "low" */
+#define DI_H()		__asm volatile ( "vmov      r3,s4 \n orr r3,#0x0400 \n vmov s4,r3 \n movs r3,#4 \n movw r4,#0x0c00 \n movt r4,#0x4002 \n str r3,[r4,#0x14] ":::"r3","r4"); 	/* Set MMC DI "high" */
+#define DI_L()		__asm volatile ( "vmov       r3,s4 \n bfc r3,#10,#1 \n vmov s4,r3 \n movs r3,#0 \n movw r4, #0x0c00 \n movt r4,#0x4002 \n str r3,[r4,#0x14]":::"r3", "r4"); 	/* Set MMC DI "low" */
 
 //#define CK_INIT()	DDRB  |= 0x04	/* Initialize port for MMC SCLK as output */
-#define CK_H()		GPIOC->BSRRL = 1<<12	/* Set MMC SCLK "high" */
-#define	CK_L()		GPIOC->BSRRH = 1<<12	/* Set MMC SCLK "low" */
+//#define CK_H()		GPIOC->BSRRL = 1<<12	/* Set MMC SCLK "high" */
+//#define	CK_L()		GPIOC->BSRRH = 1<<12	/* Set MMC SCLK "low" */
+#define CK_H()		portc_state |= 1<<12 ; GPIOC->ODR = portc_state;
+#define	CK_L()		portc_state &= ~(1 << 12); GPIOC->ODR = portc_state;
 
 //#define CS_INIT()	DDRB  |= 0x08	/* Initialize port for MMC CS as output */
-#define	CS_H()		GPIOC->BSRRL = 1<<11	/* Set MMC CS "high" */
-#define CS_L()		GPIOC->BSRRH = 1<<11	/* Set MMC CS "low" */
+//#define	CS_H()		GPIOC->BSRRL = 1<<11	/* Set MMC CS "high" */
+//#define CS_L()		GPIOC->BSRRH = 1<<11	/* Set MMC CS "low" */
+#define	CS_H()		portc_state |= 1<<11 ; GPIOC->ODR = portc_state;
+#define CS_L()		portc_state &= ~(1<<11) ; GPIOC->ODR = portc_state;
 
 
 static void dly_us(UINT n)
