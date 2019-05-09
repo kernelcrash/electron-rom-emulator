@@ -40,27 +40,15 @@ reg_save_r11_s30	.req    s30
 .endm
 
 .macro databus_write_delay
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
-	nop
+	.rept 10
+		nop
+	.endr
 .endm
 
 .macro databus_read_extra_delay
-        nop
-        nop
-        nop
-        nop
-        nop
-        nop
-        nop
-        nop
+	.rept 8
+        	nop
+	.endr
 .endm
 
 
@@ -84,7 +72,10 @@ reg_save_r11_s30	.req    s30
 rom_base_start:
 // put up to 4 16K roms here between rom_base_start and rom_base_end.
 // Each rom must be exactly 16384 bytes long
-//.incbin "roms/ESWMMFS.rom"
+.balign 16384
+.incbin "roms/crap.rom"
+.balign 16384
+.incbin "roms/ESWMMFS.rom"
 //.incbin "roms/AP6v130ta.rom"
 //.incbin "roms/blank.rom"
 rom_base_end:
