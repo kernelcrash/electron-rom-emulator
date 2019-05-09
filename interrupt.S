@@ -62,7 +62,7 @@ reg_save_r11_s30	.req    s30
 	.global EXTI0_IRQHandler
 	.global rom_base_start
 	.global rom_base_end
-	.global swram_low_base			// swram 4,5,6,7  - for future.
+	.global swram_low_base			// swram 4,5,6,7  
 	.global swram_high_base			// swram 12,13,14,15
 	.global main_thread_command
 	.global main_thread_data
@@ -70,13 +70,12 @@ reg_save_r11_s30	.req    s30
 .section .rodata
 
 rom_base_start:
-// put up to 4 16K roms here between rom_base_start and rom_base_end.
-// Each rom must be exactly 16384 bytes long
-.balign 16384
-.incbin "roms/crap.rom"
-.balign 16384
-.incbin "roms/ESWMMFS.rom"
+// put up to 4 16K roms here between rom_base_start and rom_base_end. These will end up as roms 12, 13, 14 and 15.
+// Each rom must be exactly 16384 bytes long or use .balign 16384 between roms
+//.incbin "roms/ESWMMFS.rom"
+//.balign 16384
 //.incbin "roms/AP6v130ta.rom"
+//.balign 16384
 //.incbin "roms/blank.rom"
 rom_base_end:
 
@@ -205,9 +204,6 @@ rom_base_end:
 //#define	DATA_OUT_MODE	0x55550010
 //#define	DATA_IN_MODE	0x00000010
 
-// If using SDIO need to set PD2 to alternate function
-//#define	DATA_OUT_MODE	0x55550020
-//#define	DATA_IN_MODE	0x00000020
 
 
 
@@ -276,8 +272,7 @@ upper_32k:
 
         bfi     r0,r12,#14,#2
 	tst	r1,#0x0002
-        //beq     exit_EXTI0	// should be to write_sdram
-        beq     write_sideways_ram	// should be to write_sdram
+        beq     write_sideways_ram	// should be to write to sideways ram
 #ifdef DEBUG_EXTI0_ROM_ACCESS
         vstr     reg_zero_s0,[r11,ODR]
 #endif
@@ -345,7 +340,6 @@ process_registers:
 
 register_unused:
 	unrolled_exit_EXTI0
-	//b exit_EXTI0
 
 // Handle registers we are interested in
 register_0xfe05:
@@ -364,7 +358,6 @@ register_0xfe05:
         vstr     s1,[r11, ODR]
 #endif
 	unrolled_exit_EXTI0
-        //b       exit_EXTI0
 
 // ROM swap control ports
 register_0xfc04:
@@ -422,7 +415,6 @@ register_0xfc71:
         vstr     reg_zero_s0,[r11,ODR]  // set PA0 HIGH
 #endif
 
-        //b       exit_EXTI0
 	unrolled_exit_EXTI0
 
 
@@ -463,8 +455,6 @@ register_0xfc72:
         str     r1,[r2, C_TO_D_OFFSET + MODER]  // MODER set to inputs
 
 
-        //b       wait_again_theta0_low
-        //b       exit_EXTI0
 	unrolled_exit_EXTI0
 
 

@@ -394,7 +394,6 @@ void scan_and_load_roms() {
 	FRESULT res;
 	FIL	fil;
         TCHAR root_directory[11] = "/boot/";
-        TCHAR root_rom[15] = "/rom";
 
         TCHAR full_filename[64];
         DIR dir;
@@ -403,7 +402,6 @@ void scan_and_load_roms() {
         char *swram;
 	int rom_offset;
 	int  root_directory_base_length= strlen(root_directory);
-	int  root_rom_base_length= strlen(root_rom);
 
 	for (int highlow = 0;highlow <= 1 ; highlow++) {
            if (highlow==0) {
@@ -418,8 +416,6 @@ void scan_and_load_roms() {
                  rom_offset=4;
               }
               itoa_base10(i+rom_offset, &root_directory[root_directory_base_length]);
-              itoa_base10(i+rom_offset, &root_rom[root_rom_base_length]);
-              strcat(root_rom,".rom");
 #ifdef ENABLE_SEMIHOSTING
 	      printf("about to open %s\n",root_directory);
 #endif
@@ -451,20 +447,7 @@ void scan_and_load_roms() {
                           break;   // only interested in the first file in the dir
                    }
                    f_closedir(&dir);
-              } else {
-		  if (res != FR_OK) {
-#ifdef ENABLE_SEMIHOSTING
-                       printf("Try to open %s %0x08x\n",root_rom,swram);
-#endif
-                	res = f_open(&fil, root_rom, FA_READ);
-			if (res == FR_OK) {
-				if (highlow==0) {
-                               		res = f_read(&fil, swram, 16384, &BytesRead);
-				}
-				f_close(&fil);
-			}
-		  }
-	      }
+              }
 	      swram+=0x4000;
            }
         }
