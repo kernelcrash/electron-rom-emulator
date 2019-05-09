@@ -5,16 +5,49 @@
     .fpu softvfp
     .thumb
 
+/* MACROS */
+.macro databus_write_delay
+#ifdef DEBUG_EDGES
+        .rept 7
+#else
+        .rept 11
+#endif
+
+                nop
+        .endr
+.endm
+
+.macro databus_read_extra_delay
+	.rept 3
+                nop
+        .endr
+.endm
+
+
 .section .rodata
-// Can put up to four 16K roms here which will get mapped to rom 12, 13, 14 and 15
+// Can put up to four 16K roms here which will get mapped to rom 4,5,6,7 as sideways ram
+sideways_ram_preload:
+//.incbin "roms/ESWMMFS.rom"
+//.incbin "roms/AP6v130ta.rom"
+//.incbin "roms/Viewsheet-v1.0e.rom"
+sideways_ram_preload_end:
+
+
+// These roms get mapped to rom 12, 13, 14, 15
 rom_base:
 // be careful if you add roms and later delete them. The old ones might be still in the STM32 flash
-.incbin "roms/EMMFS.rom"
+//.incbin "roms/EMMFS.rom"
+//.incbin "roms/EMMFS-with-ROMS-commands.rom"
+//.incbin "roms/ESWMMFS.rom"
 //.incbin "roms/Viewsheet-v1.0e.rom"
 //.incbin "roms/blank.rom"
-//.incbin "roms/blank.rom"
+//.incbin "roms/AP6v130ta.rom"
+.incbin "roms/blank.rom"
 //.incbin "roms/Logo-v1.0e_1.rom"
 //.incbin "roms/Logo-v1.0e_2.rom"
+
+.section bss
+       .lcomm swram_base,0x10000		// allocate 4 SWRAM slots ROM 4, 5, 6, 7
 
         .equ PERIPH_BASE     ,   0x40000000                                                                
         .equ PERIPH_BASE_APB1,   (PERIPH_BASE + 0x00000)
@@ -107,6 +140,7 @@ reg_rom_base	.req	r4
 reg_rom_bank	.req	r7  // rom bank register
 reg_pd2_state	.req	r8
 reg_databus_out_mode	.req	r9  // MODER setting for D15-D8 out and D2 out
+reg_swram_base	.req	r10  
 
 // I tried using .data here, but it runs slower than flash on the F4. I think this is due to the ART accelerator
 .section .text
@@ -116,7 +150,7 @@ reg_databus_out_mode	.req	r9  // MODER setting for D15-D8 out and D2 out
 // tbh only makes FORWARD jumps, so we put the register processor first to allow all the other code to be together lower down
 process_registers:
 	subs	r5,r5,#0xfc00
-	bmi	negative_theta0_edge_loop  // jump away if its between c000 and fbff
+	bmi	wait_for_phi0_to_go_low  // jump away if its between c000 and fbff
 // the TBH does a jump table based on possible 'IO register addresses from external computer'. Each entry is 2 bytes, and will 
 // usually jump to register_unused. But change entries for the registers you want to emulate (eg. FE05 is the sideways ROM register
 // in an Electron
@@ -126,6 +160,27 @@ process_registers:
 asm_poller:
 	// disable all interrupts. We never come out of this. if we did we would use 'cpsie i'
 	cpsid i
+	// clear swram first
+	ldr	r1,=swram_base
+	movs	r0,#0
+	str	r0,[r1]
+	adds	r1,#0x4000
+	str	r0,[r1]
+	adds	r1,#0x4000
+	str	r0,[r1]
+	adds	r1,#0x4000
+	str	r0,[r1]
+
+	// copy up to 4 roms into ram , so that slots 4,5,6 and 7 are sideways ram
+	ldr	r1,=swram_base
+	ldr 	r0,=sideways_ram_preload
+	ldr	r2,=sideways_ram_preload_end
+
+1:	ldr	r3,[r0], #4
+	str	r3,[r1], #4
+	cmp	r0,r2
+	blt	1b
+
 	// Use as many registers as we can
 	ldr	reg_gpioa_base,=GPIOA_BASE
 	ldr	reg_gpioc_base,=GPIOC_BASE
@@ -135,136 +190,68 @@ asm_poller:
 //	r6 is scratch
 //	r7 is the rom_bank register
 	ldr	reg_rom_base,=rom_base
+	ldr	reg_swram_base,=swram_base
 	ldr	reg_databus_out_mode,=DATA_OUT_MODE
 	//ldr	reg_databus_in_mode,=DATA_IN_MODE
 	movs	reg_pd2_state,#0
 	
-positive_theta0_edge_loop:
-	ldr	r5,[reg_gpioe_base,IDR]		// get the addres BEFORE we test theta0. It should be valid 'just before' theta0 goes high. NB: top halfword should be 0x0000
-	ldr	r6,[reg_gpioc_base,#0x10]	// get the portc control pins
-	tst	r6,#1				// see if theta0 has gone high
+wait_for_phi0_to_go_high:
+1:	ldr	r5,[reg_gpioe_base,IDR]		// get the addres BEFORE we test phi0. It should be valid 'just before' phi0 goes high. NB: top halfword should be 0x0000
+	ldr	r6,[reg_gpioc_base,IDR]	// get the portc control pins
+	tst	r6,#1				// see if phi0 has gone high
+	beq	1b
 #ifdef DEBUG_EDGES
-	IT	NE
-	strne	r6,[reg_gpioa_base,ODR]		// debug output
+	str	r6,[reg_gpioa_base,ODR]		// debug output
 #endif
-	bne.n	theta0high
-	ldr	r5,[reg_gpioe_base,IDR]		// get the addres BEFORE we test theta0. It should be valid 'just before' theta0 goes high. NB: top halfword should be 0x0000
-	ldr	r6,[reg_gpioc_base,#0x10]	// get the portc control pins
-	tst	r6,#1				// see if theta0 has gone high
-#ifdef DEBUG_EDGES
-	IT	NE
-	strne	r6,[reg_gpioa_base,ODR]		// debug output
-#endif
-	bne.n	theta0high
-	ldr	r5,[reg_gpioe_base,IDR]		// get the addres BEFORE we test theta0. It should be valid 'just before' theta0 goes high. NB: top halfword should be 0x0000
-	ldr	r6,[reg_gpioc_base,#0x10]	// get the portc control pins
-	tst	r6,#1				// see if theta0 has gone high
-#ifdef DEBUG_EDGES
-	IT	NE
-	strne	r6,[reg_gpioa_base,ODR]		// debug output
-#endif
-	bne.n	theta0high
-	ldr	r5,[reg_gpioe_base,IDR]		// get the addres BEFORE we test theta0. It should be valid 'just before' theta0 goes high. NB: top halfword should be 0x0000
-	ldr	r6,[reg_gpioc_base,#0x10]	// get the portc control pins
-	tst	r6,#1				// see if theta0 has gone high
-#ifdef DEBUG_EDGES
-	IT	NE
-	strne	r6,[reg_gpioa_base,ODR]		// debug output
-#endif
-	bne.n	theta0high
-	ldr	r5,[reg_gpioe_base,IDR]		// get the addres BEFORE we test theta0. It should be valid 'just before' theta0 goes high. NB: top halfword should be 0x0000
-	ldr	r6,[reg_gpioc_base,#0x10]	// get the portc control pins
-	tst	r6,#1				// see if theta0 has gone high
-#ifdef DEBUG_EDGES
-	IT	NE
-	strne	r6,[reg_gpioa_base,ODR]		// debug output
-#endif
-	bne.n	theta0high
-	b.n	positive_theta0_edge_loop
 
 
-theta0high:
-#ifdef DEBUG_ROM
-	str	r6,[reg_gpioa_base,ODR]
-#endif
+phi0high:
+        lsls    r11,r5,#17
+        bcc     wait_for_phi0_to_go_low       // A15 low
+        bmi     process_registers
+        // Must be an access between 8000 and BFFF
+	lsls    r12,reg_rom_bank,#29            // Move b3 into Carry. Move b2 into Plus/MInus
+        bpl     wait_for_phi0_to_go_low       // exit if ROMS 0-3 and 8-11
+        ITE     CC
+        movcc   r11,reg_swram_base
+        movcs   r11,reg_rom_base
+        bfi     r5,reg_rom_bank,#14,#2		// copy bottom two bits of rom bank select register into r5 bits 15 and 14
+        tst     r6,#0x0002      // check r/_w
+        beq     write_sideways_ram
+        ldrb    r6,[r11,r5]             // get the byte from the rom or ram
+        lsl     r6,r6, #8
+        orr     r6,r6,reg_pd2_state     // add in PD2
+        str     r6,[reg_gpiod_base, ODR] // GPIOD ODR
+        str     reg_databus_out_mode,[reg_gpiod_base, MODER]  // MODER set to outputs
+	b       wait_for_phi0_to_go_low
+write_sideways_ram:
+	cmp	r11,reg_swram_base
+	bne	wait_for_phi0_to_go_low		// exit if attempt to write to 12, 13, 14 or 15. Only 4, 5, 6, 7 are sideways ram
+	databus_write_delay
+        ldr     r6,[reg_gpiod_base, IDR]
+        lsr     r6,r6, #8
+        strb    r6,[r11,r5]
+        b       wait_for_phi0_to_go_low
 
-	cmp	r5,#0xC000
-	bge	process_registers
-//possibly a ROM address. Is below C000
-// at this point r5 is the address bus. r6 is the portc bits
-	tst	r6,#0x0002		// see if r/w is high. 
-	beq.n	negative_theta0_edge_loop
-	ands	r6,r5,#0xC000
-	cmp	r6,#0x8000			// is an address from 0x8000 to 0xBFFF
-	bne.n	negative_theta0_edge_loop
-	subs	r6,reg_rom_bank,#12		// only support roms 12,13,14,15
-	bmi.n	negative_theta0_edge_loop
-	bfi	r5,r6,#14,#2			// copy bits 1 and 0 from r6 into 15 and 14 of r6
-	ldrb	r6,[reg_rom_base,r5]		// get the byte from the rom
-	lsls	r6,r6, #8
-	orr	r6,r6,reg_pd2_state	// add in PD2
-	str	r6,[reg_gpiod_base, #0x14] // GPIOD ODR
-	str	reg_databus_out_mode,[reg_gpiod_base, #0x00]  // MODER set to outputs
 
-#ifdef DEBUG_ROM
-	movs	r5,#0
-	str	r5,[reg_gpioa_base,ODR]
-#endif
-	b.n	negative_theta0_edge_loop	
-// This next bit is for the end of the cycle. Waiting for theta0 to go low
-// Technically this comes at the end of the cycle, but putting it in the middle of the codebase for now
-// the IT/ITT bit is to make the data bus go tristate as fast as we can
+
+
+
+
 register_unused:
-negative_theta0_edge_loop:
+wait_for_phi0_to_go_low:
 	ldr     r5,=DATA_IN_MODE
-1:	ldr	r6,[reg_gpioc_base,#0x10]
+1:	ldr	r6,[reg_gpioc_base,IDR]
 	tst	r6,#0x0001
-	IT	EQ
-	streq	r5,[reg_gpiod_base, #0x00]  // MODER set to inputs
-	beq.n	theta0_low
+	bne	1b
+	databus_read_extra_delay		
+	str	r5,[reg_gpiod_base, #0x00]  // MODER set to inputs
 
-	ldr	r6,[reg_gpioc_base,#0x10]
-	tst	r6,#0x0001
-	IT	EQ
-	streq	r5,[reg_gpiod_base, #0x00]  // MODER set to inputs
-	beq.n	theta0_low
-
-	ldr	r6,[reg_gpioc_base,#0x10]
-	tst	r6,#0x0001
-	IT	EQ
-	streq	r5,[reg_gpiod_base, #0x00]  // MODER set to inputs
-	beq.n	theta0_low
-
-	ldr	r6,[reg_gpioc_base,#0x10]
-	tst	r6,#0x0001
-	IT	EQ
-	streq	r5,[reg_gpiod_base, #0x00]  // MODER set to inputs
-	beq.n	theta0_low
-
-	ldr	r6,[reg_gpioc_base,#0x10]
-	tst	r6,#0x0001
-	IT	EQ
-	streq	r5,[reg_gpiod_base, #0x00]  // MODER set to inputs
-	beq.n	theta0_low
-
-	ldr	r6,[reg_gpioc_base,#0x10]
-	tst	r6,#0x0001
-	IT	EQ
-	streq	r5,[reg_gpiod_base, #0x00]  // MODER set to inputs
-	beq.n	theta0_low
-
-	ldr	r6,[reg_gpioc_base,#0x10]
-	tst	r6,#0x0001
-	IT	EQ
-	streq	r5,[reg_gpiod_base, #0x00]  // MODER set to inputs
-	beq.n	theta0_low
-
-	b.n	1b
-theta0_low:
+phi0_low:
 #ifdef DEBUG_EDGES
 	str	r6,[reg_gpioa_base,ODR]  // set PA0 LOW
 #endif
-	b.n	positive_theta0_edge_loop
+	b	wait_for_phi0_to_go_high
 
 // Handle registers we are interested in
 register_0xfe05:
@@ -274,18 +261,18 @@ register_0xfe05:
 #endif
 
 	tst	r6,#0x0002	// see if r/w is low
-	bne.n	negative_theta0_edge_loop
-	ldr	reg_rom_bank,[reg_gpiod_base, #0x10] // GPIOD IDR
+	bne	wait_for_phi0_to_go_low
+	ldr	reg_rom_bank,[reg_gpiod_base, IDR] // GPIOD IDR
 	lsrs	reg_rom_bank,reg_rom_bank, #8
 	ands	reg_rom_bank,reg_rom_bank,#0x0f
 #ifdef DEBUG_FE05
 	str	r6,[reg_gpioa_base,ODR]  // set PA0 low
 #endif
-	b.n	negative_theta0_edge_loop
+	b	wait_for_phi0_to_go_low
 // FC71 is the Electron Plus 1 printer out port
 register_0xfc71:
 	tst	r6,#0x0002	// see if r/w is low
-	bne.n	negative_theta0_edge_loop
+	bne	wait_for_phi0_to_go_low
 #ifdef DEBUG_FC71
 	movs	r5,#1
 	str	r5,[reg_gpioa_base,ODR]  // set PA0 high
@@ -293,27 +280,27 @@ register_0xfc71:
 // MOSI is D0, SCK is D1 from the Electrons perspective. These come in on D8 and D9 for us.
 // MOSI needs to go out as PD2. SCK goes out as PC12 and we need to keep PC11 low for CS/
 	movs	reg_pd2_state,#0
-	ldr	r5,[reg_gpiod_base, #0x10] // GPIOD IDR
+	ldr	r5,[reg_gpiod_base, IDR] // GPIOD IDR
 	tst	r5,#0x0100  // D8
-	beq.n	1f
+	beq	1f
 	movs	reg_pd2_state,#0x0004
-1:	str	reg_pd2_state,[reg_gpiod_base, #0x14]
+1:	str	reg_pd2_state,[reg_gpiod_base, ODR]
 	movs	r6,#0
 	tst	r5,#0x0200
-	beq.n	2f
+	beq	2f
 	orr	r6,r6,#0x1000		// set bit 12
-2:	str	r6,[reg_gpioc_base,#0x14] // GPIOC ODR
+2:	str	r6,[reg_gpioc_base,ODR] // GPIOC ODR
 	
 #ifdef DEBUG_FC71
 	movs	r5,#0
 	str	r5,[reg_gpioa_base,ODR]  // set PA0 HIGH
 #endif
 
-	b.n	negative_theta0_edge_loop
+	b	wait_for_phi0_to_go_low
 register_0xfc72:
 	// First check if this is a READ
 	tst	r6,#0x0002	// see if r/w is low
-	beq.n	negative_theta0_edge_loop
+	beq	wait_for_phi0_to_go_low
 #ifdef DEBUG_FC72
 	movs	r5,#1
 	str.w	r5,[reg_gpioa_base,ODR]
@@ -323,11 +310,11 @@ register_0xfc72:
 	ands	r6,r6,#0x0100
 	lsls	r6,r6,#7
 	orr	r6,r6,reg_pd2_state   // add in PD2
-	str	r6,[reg_gpiod_base, #0x14] // GPIOD ODR
+	str	r6,[reg_gpiod_base, ODR] // GPIOD ODR
 	str	reg_databus_out_mode,[reg_gpiod_base, #0x00]  // MODER set to outputs
 
 #ifdef DEBUG_FC72
 	movs	r5,#0
 	str.w	r5,[reg_gpioa_base,ODR]
 #endif
-	b.n	negative_theta0_edge_loop
+	b	wait_for_phi0_to_go_low

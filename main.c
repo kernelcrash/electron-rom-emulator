@@ -97,7 +97,7 @@ void config_gpio_portc(void) {
 	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
 	GPIO_Init(GPIOC, &GPIO_InitStructure);
 	// PC10 out, PC11 out, PC12 out
-	GPIOC->MODER = 0x01500000;
+	GPIOC->MODER = 0x01400000;
 	GPIOC->ODR = 0x0000;
 }
 

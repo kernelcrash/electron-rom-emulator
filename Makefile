@@ -32,7 +32,6 @@ CFLAGS += -mfloat-abi=hard -mfpu=fpv4-sp-d16
 CFLAGS += -I.
 CFLAGS += --specs=nosys.specs
 #CFLAGS += -DDEBUG_EDGES
-#CFLAGS += -DDEBUG_ROM
 #CFLAGS += -DDEBUG_FE05 -DDEBUG_FC71 -DDEBUG_FC72
 #CFLAGS += -DDEBUG_FC72
 
