@@ -11,42 +11,42 @@ https://github.com/hoglet67/MMFS, but should be able to emulate any 16KB Electro
   Because only 4 ROM slots are emulated you can only put up to four incbin lines here. The first incbin is ROM 12, the
   second is ROM 13 and so on. Make sure the rom files are exactly 16384 bytes long. Or use .balign 16384 between each
   ROM file
-
+```
       rom_base:
       // be careful if you add roms and later delete them. The old ones might be still in the STM32 flash
       .incbin "roms/Viewsheet-v1.0e.rom"
-
+```
 - The 4 sideways RAM slots are 4, 5, 6 and 7. The main goal with the sideways RAM support was to be able to load
   the ESWMMFS.rom (Electron sideways RAM version of MMFS) so technically I only really needed one, but it was
   easier to implement 4 sideways RAM slots.
 
   The code 'preloads' zero to four  incbin'd ROM file into the sideways RAM slots (ie. the first incbin'd rom goes 
   into slot 4, the 2nd to slot 5 and so on). Generally you would want to put ESWMMFS.rom in this per the example below:
-
+```
       sideways_ram_preload:
       .incbin "roms/ESWMMFS.rom"
       sideways_ram_preload_end:
-
+```
   A key advantage of using the Sideways RAM version of MMFS is that you can load games that require PAGE = E00.
   NB: It wouldn't be very hard to preload more than one ROM into the sideways RAM slots.
 
 - Emulates the sideways ROM register at FE05
 - Emulates the printer output port at FC71, and printer ACK in FC72. 
   On my cheap STM32F407VET6 board, the onboard SD card adapter is prewired like so
-
+```
    /CS    - PC11
    MOSI   - PD2
    SCK    - PC12
 
    MISO   - PC8
-
+```
   Per the MMFS ROM wiring guide for connecting an SD card to the printer port of a Plus 1,
-
+```
    FC71 D0 goes to MOSI
    FC71 D1 goes to SCK
 
    FC72 D7 goes to MISO
-
+```
 - Wiring from the 50 pin edge connector on the Electron to the STM42F407VET6 board is as follows
 ```
 	   BOTTOM	TOP (towards the AC INPUT)
