@@ -257,7 +257,7 @@ void rcc_set_frequency(enum sysclk_freq freq)
 //
 //        NVIC_InitStructure.NVIC_IRQChannel = SDIO_IRQn;
 //        //NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
-//        NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 2;    // This must be a lower priority (ie. higher number) than the theta0 int
+//        NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 2;    // This must be a lower priority (ie. higher number) than the phi0 int
 //        NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
 //        NVIC_InitStructure.NVIC_IRQChannelCmd = state;
 //        NVIC_Init(&NVIC_InitStructure);

@@ -228,7 +228,6 @@ EXTI0_IRQHandler:
 	vmov	reg_save_r11_s30,r11		// effectively s30 is our 'stack'
 	vmov r11,reg_gpioa_base_s5
 #endif
-
 #ifdef DEBUG_EXTI0_START
         //movs    r0,#0
         vstr     reg_zero_s0,[r11,ODR]
@@ -246,14 +245,14 @@ EXTI0_IRQHandler:
 	//vmov	s6,r0		// should be able to compute this from main thread
 
 	vmov	r2,reg_gpioc_base_s2
-wait_for_theta0_high:
+wait_for_phi0_high:
 	movs	r3,#1
 2:	ldr	r0,[r2, C_TO_E_OFFSET+IDR]
 	ldr	r1,[r2,IDR]
 	tst	r1,r3
 	beq	2b
 
-theta0_high:
+phi0_high:
 	lsls	r3,r0,#17	// A15 -> C
 	bcs	upper_32k	
 
@@ -299,7 +298,7 @@ upper_32k:
         sev     // set the event register
         wfe     // clear the event register
 // So the 2nd wfe is meant to wait for the -ve edge, but if you get a spurious edge at exactly the time these instructions execute, it can slip through without waiting
-        wfe     // wait for -ve edge of theta0
+        wfe     // wait for -ve edge of phi0
 
 	databus_read_extra_delay
 
@@ -310,7 +309,7 @@ upper_32k:
         vstr     reg_zero_s0,[r11,ODR]
 #endif
 
-	b	wait_for_theta0_high
+	b	wait_for_phi0_high
 
 
 write_sideways_ram:
@@ -324,7 +323,7 @@ write_sideways_ram:
 	strb	r1,[r3,r0]
 
 	unrolled_exit_EXTI0
-	//b	wait_for_theta0_high		// We should probably exit here, as theta0 is probably already high
+	//b	wait_for_phi0_high		// We should probably exit here, as phi0 is probably already high
 
 
 
