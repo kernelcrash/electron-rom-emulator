@@ -67,18 +67,20 @@ reg_save_r11_s30	.req    s30
 	.global main_thread_command
 	.global main_thread_data
 
+	.global slot_4_base
+	.global slot_5_base
+	.global slot_6_base
+	.global slot_7_base
+
+	.global slot_12_base
+	.global slot_13_base
+	.global slot_14_base
+	.global slot_15_base
+	.global slots_end
+
 .section .rodata
 
-rom_base_start:
-// put up to 4 16K roms here between rom_base_start and rom_base_end. These will end up as roms 12, 13, 14 and 15.
-// Each rom must be exactly 16384 bytes long or use .balign 16384 between roms
-//.incbin "roms/ESWMMFS.rom"
-//.balign 16384
-//.incbin "roms/AP6v130ta.rom"
-//.balign 16384
-//.incbin "roms/blank.rom"
-rom_base_end:
-
+.include  "roms-preloaded-from-flash.S"
 
 .section ccmram
 	// swram_low_base consumes the entire 64K CCMRAM . Look in stm32_flash.ld for where the global symbol is defined
@@ -433,6 +435,7 @@ register_0xfc72:
 	lsrs	r0,r12,#8	// get PD2 state into lower 8 bits
         orr     r1,r1,r0   // add in PD2
 	vmov	r0,reg_dataout_moder_s8
+	orr	r1,#0x7000	// Make it look like the joystick button is not pressed
         str     r1,[r2,C_TO_D_OFFSET+ODR] // GPIOD ODR
         str     r0,[r2, C_TO_D_OFFSET+MODER]  // MODER set to outputs
         //movs    r1,#1

@@ -261,37 +261,34 @@ Comment it out , and recompile.
 
 - The current code has two ways of loading ROMS as the system boots;
 
-   - You reference one or more ROMS in interrupt.S
+   - You reference one or more ROMS in roms-preloaded-from-flash.S
    - You put some ROMS inthe SD card under boot/4, boot/5, boot/6, boot/7, boot/12, boot/13, boot/14 or boot/15
 
-Both methods are attempted on boot in the order shown above. So if you defined two
-ROMs in interrupt.S, they would be loaded into slots 12 and 13. But it you also put
-a ROM in boot/12 on the SD card, then slot 12 would be overridden with what you had
+Both methods are attempted on boot in the order shown above. So let's say you defined two
+ROMs in roms-preloaded-from-flash.S, and they were defined to load as slot 12 and 13.
+But it you also put a ROM in boot/12 on the SD card, then slot 12 would be overridden with what you had
 on the SD card. Similarly slot 13 would be overridden in you had a ROM in boot/13 on
-the SD card and so on. NOTE: Currently it only loads up to 4 roms from flash into 
-the slots 12, 13, 14, 15. It doesn't try to load into slots 4, 5, 6, 7.
+the SD card and so on. 
 
-To use preloading from flash, place the roms paths as incbin lines between the 
-rom_base_start and rom_base_end labels in interrupt.S like the example below. You 
-are limited to 4 incbin lines (ROMS 12, 13, 14 and 15)
+To use preloading from flash, place the roms paths as incbin lines  after the 
+relevant slot labels in  roms-preloaded-from-flash.S
 ```
-      rom_base_start:
-      // be careful if you add roms and later delete them. The old ones might be still in the STM32 flash
-      .incbin "roms/ESWMMFS.rom"
-      .incbin "roms/AP6v130ta.rom"
-      rom_base_end:
+      slot_4_base:
+        .incbin "roms/ESWMMFS.rom"
+      slot_5_base:
+        .incbin "roms/AP6v130ta.rom"
+      slot_6_base:
+        //.incbin "roms/blank.rom"
+      slot_7_base:
+        //.incbin "roms/blank.rom"
+      
 ```      
-Obviously 'make' and flash the hex file to the stm32f407 board to use these.
+Obviously 'make' and flash the hex file to the stm32f407 board to use these. (you might need
+to do a 'make clean' then 'make')
 
 For reference the AP6v130ta.rom referred to above is the 16K AP6 rom from 
 http://mdfs.net/Software/BBC/SROM/Plus1/ . That will give you a *ROMS
 command as well as various sideways ram load/save commands. I often put this as rom 13.
-One word of warning is that the AP6v130ta.rom you download is not padded to 16K so will cause
-problems if you put another incbin line after it in interrupt.S. Alternatively, pad the rom 
-out to 16384 bytes. In linux I would do this:
-```
-   truncate -s 16384 AP6v130ta.rom
-```
 
 - The flash accelerator had some problems in early stm32f4 chips. Find this line in main.c:
 ```

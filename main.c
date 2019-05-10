@@ -20,6 +20,16 @@ extern volatile uint8_t *rom_base_end;
 extern volatile uint8_t *swram_low_base;
 extern volatile uint8_t *swram_high_base;
 
+extern volatile uint8_t *slot_4_base;
+extern volatile uint8_t *slot_5_base;
+extern volatile uint8_t *slot_6_base;
+extern volatile uint8_t *slot_7_base;
+extern volatile uint8_t *slot_12_base;
+extern volatile uint8_t *slot_13_base;
+extern volatile uint8_t *slot_14_base;
+extern volatile uint8_t *slot_15_base;
+extern volatile uint8_t *slots_end;
+
 #ifdef ENABLE_SEMIHOSTING
 extern void initialise_monitor_handles(void);   /*rtt*/
 #endif
@@ -103,45 +113,59 @@ void delay_ms(const uint16_t ms)
    }
 }
 
-void copy_rom_to_ram(uint8_t *src_start, uint8_t *src_end, uint8_t *to) {
-   uint32_t *p, *end, *dest;
-   //
-   // copy in 4 byte chunks
-   p = (uint32_t *)src_start;
-   end = (uint32_t *)src_end;
-   dest = (uint32_t *)to;
+void my_memcpy(unsigned char *dest, unsigned char *from, unsigned char *to) {
+	unsigned char *q = dest;
+	unsigned char *p = from;
 
-#ifdef ENABLE_SEMIHOSTING
-      printf("%s: request (%08x to %08x)\n", __FUNCTION__,p,end);
-#endif
+	while (p<to) {
+		*q++ = *p++;
+	}
+}
 
-   if (p >= end) {
-#ifdef ENABLE_SEMIHOSTING
-      printf("%s: No roms in flash\n", __FUNCTION__);
-#endif
-	   return;
-   }
-   if ((end - p) > 0x10000) {
 
-#ifdef ENABLE_SEMIHOSTING
-      printf("%s: roms exceed limit (%08x to %08x). Truncate to limit\n", __FUNCTION__,p,end);
-#endif
-      end = (p + 0x10000);
-#ifdef ENABLE_SEMIHOSTING
-      printf("%s: new limit (%08x to %08x)\n", __FUNCTION__,p,end);
-#endif
-   }
+void copy_rom_to_ram() {
 
-   int count=0;
-   while (p <end) {
-      *dest++ = *p++;
-      count++;
-   }
-#ifdef ENABLE_SEMIHOSTING
-   printf("%s: copied %08x longs\n", __FUNCTION__,count);
-#endif
+	unsigned char *swram = (unsigned char *) &swram_low_base;
+
+	if ((&slot_5_base - &slot_4_base)> 0) {
+		my_memcpy(swram,(unsigned char *)&slot_4_base,(unsigned char *)&slot_5_base);
+	}		
+	swram+=16384;
+	if ((&slot_6_base - &slot_5_base)> 0) {
+		my_memcpy(swram,(unsigned char *)&slot_5_base,(unsigned char *)&slot_6_base);
+	}		
+	swram+=16384;
+	if ((&slot_7_base - &slot_6_base)> 0) {
+		my_memcpy(swram,(unsigned char *)&slot_6_base,(unsigned char *)&slot_7_base);
+	}		
+	swram+=16384;
+	if ((&slot_12_base - &slot_7_base)> 0) {
+		my_memcpy(swram,(unsigned char *)&slot_7_base,(unsigned char *)&slot_12_base);
+	}		
+
+
+	swram = (unsigned char *) &swram_high_base;
+
+	if ((&slot_13_base - &slot_12_base)> 0) {
+		my_memcpy(swram,(unsigned char *)&slot_12_base,(unsigned char *)&slot_13_base);
+	}		
+	swram+=16384;
+	if ((&slot_14_base - &slot_13_base)> 0) {
+		my_memcpy(swram,(unsigned char *)&slot_13_base,(unsigned char *)&slot_14_base);
+	}		
+	swram+=16384;
+	if ((&slot_15_base - &slot_14_base)> 0) {
+		my_memcpy(swram,(unsigned char *)&slot_14_base,(unsigned char *)&slot_15_base);
+	}		
+	swram+=16384;
+	if ((&slots_end - &slot_15_base)> 0) {
+		my_memcpy(swram,(unsigned char *)&slot_15_base,(unsigned char *)&slots_end);
+	}		
 
 }
+
+
+
 
 
 enum sysclk_freq {
@@ -553,9 +577,8 @@ int __attribute__((optimize("O0")))  main(void) {
 
 	//__disable_irq();
 	//
-	// Always look for roms in interrupt.S between the rom_base_start and rom_base_end labels and preload them into the sideways ram buffer.
-	// If you don't define and roms in interrupt.S then roms will get loaded from SD card later on.
-	copy_rom_to_ram((uint8_t*) &rom_base_start, (uint8_t*) &rom_base_end, (uint8_t*) &swram_high_base);
+	// If you define roms to load in roms-preloaded-from-flash.S, they will get loaded in here.
+	copy_rom_to_ram();
 
 #ifdef ENABLE_SEMIHOSTING
         initialise_monitor_handles();   /*rtt*/
