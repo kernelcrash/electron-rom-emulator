@@ -623,7 +623,7 @@ int __attribute__((optimize("O0")))  main(void) {
 	register volatile uint8_t* copy_swram_low_base asm("s7") __attribute__((unused)) = (volatile uint8_t*) &swram_low_base;
 	// 5555 = d15-d8 outputs and 0010 is d2 out
 	register uint32_t copy_dataout_moder asm("s8") __attribute__((unused)) = 0x55550010;
-	register uint32_t copy_adc_data asm("s9") __attribute__((unused)) = 0x80000000;
+	register uint32_t copy_adc_data asm("s9") __attribute__((unused)) = 0x00000000;
 	// Use some of the high fpu registers as a sort of stack. eg. save r11 to s30 on ISR entry, then put it back on ISR exit
 	register volatile uint8_t* fake_stack_r11 asm("s30") __attribute__((unused));
 
@@ -724,7 +724,7 @@ int __attribute__((optimize("O0")))  main(void) {
                            case (MAIN_THREAD_REQUEST_ADC_CONVERSION_COMMAND):
                                 main_thread_command |= 0x40000000;
 				// Start conversion of channel 2, or channel 3, or channel 4 etc.
-                		ADC_RegularChannelConfig(ADC1, (uint8_t) ((main_thread_command & 0x00000003)+2), 1, ADC_SampleTime_84Cycles);
+                		ADC_RegularChannelConfig(ADC1, (uint8_t) ((main_thread_command & 0x00000003)+2), 1, ADC_SampleTime_480Cycles);
                 		//ADC_RegularChannelConfig(ADC1, ADC_Channel_2, 1, ADC_SampleTime_84Cycles);
     				ADC_SoftwareStartConv(ADC1);
 

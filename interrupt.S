@@ -394,6 +394,8 @@ register_0xfc70:
         beq	write_register_0xfc70
 // Must be a read of 0xfc70
 	vmov	r1,reg_adcdata_s9
+	orr	r1,#0x8000000
+	vmov	reg_adcdata_s9,r1
 	lsls	r1,r1,#8	// bottom 8 bits of r1 into b15-8
 
 	lsrs	r0,r12,#8	// get PD2 state into lower 8 bits
@@ -426,9 +428,12 @@ write_register_0xfc70:
 	cmp	r0,#0x700
 	bgt	exit_EXTI0
 	vmov	r1,reg_adcdata_s9
+	lsls	r3,r1,#1		// b31 into Carry
+	bcs	exit_EXTI0		// exit if another conversion in progress
 	orr	r1, #0x80000000		//set b31 high to indicate that the result is not ready
 
         lsrs    r0,r0,#8	// move databus value into lower 8 bits
+
 	ands	r0,#3		// value should to 0 to 3 for ADC channels 0 to 3
         bfi     r1,r0,#0,#2	// copy lowest two bits of r0 (the adc channel) into bits 1 and 0 of r1
 	vmov 	reg_adcdata_s9,r1	// s9 should be b31=1 and bits 1 and 0 with ADC channel
