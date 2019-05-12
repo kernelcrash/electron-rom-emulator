@@ -18,7 +18,7 @@
 /
 /----------------------------------------------------------------------------*/
 
-#ifdef ENABLE_SEMIHOSTING
+#ifdef SEMIHOSTING_SDCARD
 #include <stdio.h>
 #endif
 
@@ -1069,7 +1069,7 @@ static FRESULT move_window (	/* Returns FR_OK or FR_DISK_ERR */
 		if (res == FR_OK) {			/* Fill sector window with new data */
 			if (disk_read(fs->pdrv, fs->win, sector, 1) != RES_OK) {
 				sector = 0xFFFFFFFF;	/* Invalidate window if read data is not valid */
-#ifdef ENABLE_SEMIHOSTING
+#ifdef SEMIHOSTING_SDCARD
 				printf("move_window: disk read error\n");
 #endif
 				res = FR_DISK_ERR;
@@ -3219,7 +3219,7 @@ static FRESULT find_volume (	/* FR_OK(0): successful, !=0: an error occurred */
 	FATFS *fs;
 	UINT i;
 
-#ifdef ENABLE_SEMIHOSTING
+#ifdef SEMIHOSTING_SDCARD
 	printf("find_volume\n");
 #endif
 
@@ -3236,7 +3236,7 @@ static FRESULT find_volume (	/* FR_OK(0): successful, !=0: an error occurred */
 #endif
 	*rfs = fs;							/* Return pointer to the filesystem object */
 
-#ifdef ENABLE_SEMIHOSTING
+#ifdef SEMIHOSTING_SDCARD
 	printf("find_volume 2\n");
 #endif
 	mode &= (BYTE)~FA_READ;				/* Desired access mode, write access or not */
@@ -3250,7 +3250,7 @@ static FRESULT find_volume (	/* FR_OK(0): successful, !=0: an error occurred */
 		}
 	}
 
-#ifdef ENABLE_SEMIHOSTING
+#ifdef SEMIHOSTING_SDCARD
 	printf("find_volume 3\n");
 #endif
 	/* The filesystem object is not valid. */
@@ -3495,7 +3495,7 @@ FRESULT f_mount (
 	const TCHAR *rp = path;
 
 
-#ifdef ENABLE_SEMIHOSTING
+#ifdef SEMIHOSTING_SDCARD
 	printf("f_mount\n");
 #endif
 	/* Get logical drive number */

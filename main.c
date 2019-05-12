@@ -333,7 +333,8 @@ void config_gpio_portc(void) {
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;
 	GPIO_Init(GPIOC, &GPIO_InitStructure);
 
-	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0 | GPIO_Pin_1 ;
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0 | GPIO_Pin_1 | GPIO_Pin_2 | GPIO_Pin_3;
+	//GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0 | GPIO_Pin_1 ;
 	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;
 	GPIO_Init(GPIOC, &GPIO_InitStructure);
@@ -405,6 +406,55 @@ void config_gpio_dbg(void) {
 	GPIO_Init(GPIOA, &GPIO_InitStructure);
 }
 
+void ADC_Config(void)
+{
+    RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
+    // Enable clock for ADC1
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC1, ENABLE);
+    // Init GPIOA for ADC input
+    GPIO_InitTypeDef GPIO_InitStruct;
+    GPIO_InitStruct.GPIO_Mode = GPIO_Mode_AN;
+    GPIO_InitStruct.GPIO_Pin = GPIO_Pin_2 | GPIO_Pin_3 | GPIO_Pin_4 | GPIO_Pin_5;
+    GPIO_InitStruct.GPIO_PuPd = GPIO_PuPd_NOPULL;
+    GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+    // Init ADC1
+    ADC_InitTypeDef ADC_InitStruct;
+    ADC_InitStruct.ADC_ContinuousConvMode = DISABLE;
+    ADC_InitStruct.ADC_DataAlign = ADC_DataAlign_Right;
+    ADC_InitStruct.ADC_ExternalTrigConv = DISABLE;
+    ADC_InitStruct.ADC_ExternalTrigConvEdge =
+    ADC_ExternalTrigConvEdge_None;
+    ADC_InitStruct.ADC_NbrOfConversion = 1;
+    ADC_InitStruct.ADC_Resolution = ADC_Resolution_8b;
+    ADC_InitStruct.ADC_ScanConvMode = DISABLE;
+    ADC_Init(ADC1, &ADC_InitStruct);
+    ADC_Cmd(ADC1, ENABLE);
+
+}
+
+uint16_t ADC_Read(int channel)
+{
+   uint16_t v;
+   switch(channel) {
+	   case (0): 
+    		ADC_RegularChannelConfig(ADC1, ADC_Channel_2, 1, ADC_SampleTime_84Cycles);
+		break;
+	   case (1): 
+    		ADC_RegularChannelConfig(ADC1, ADC_Channel_3, 1, ADC_SampleTime_84Cycles);
+		break;
+	   default:
+		return 0;
+   }
+    // Start ADC conversion
+    ADC_SoftwareStartConv(ADC1);
+    // Wait until conversion is finish
+    while (!ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC));
+
+    v = ADC_GetConversionValue(ADC1);
+    return v;
+}
+
 
 void config_backup_sram(void) {
 
@@ -440,12 +490,12 @@ void scan_and_load_roms() {
                  rom_offset=4;
               }
               itoa_base10(i+rom_offset, &root_directory[root_directory_base_length]);
-#ifdef ENABLE_SEMIHOSTING
+#ifdef SEMIHOSTING_SDCARD
 	      printf("about to open %s\n",root_directory);
 #endif
               res = f_opendir(&dir, root_directory);
               if (res == FR_OK) {
-#ifdef ENABLE_SEMIHOSTING
+#ifdef SEMIHOSTING_SDCARD
 		   printf("dir open\n");
 #endif
                    for (;;) {
@@ -456,7 +506,7 @@ void scan_and_load_roms() {
                           strcat(full_filename,fno.fname);
                           res = f_open(&fil, full_filename, FA_READ);
                           if (res == FR_OK) {
-#ifdef ENABLE_SEMIHOSTING
+#ifdef SEMIHOSTING_SDCARD
                              printf("%d,%d: opened %s 0x%08x\n",highlow,i,full_filename, swram);
 #endif
                              if (highlow==0) {
@@ -560,18 +610,19 @@ int __attribute__((optimize("O0")))  main(void) {
 	register uint32_t zero_register asm("s0") __attribute__((unused)) = 0;
 	register uint32_t one_register asm("s1") __attribute__((unused)) = 1;
 
-	register unsigned char* copy_gpioc_base asm("s2") __attribute__((unused)) = (unsigned char*) GPIOC;
-	register unsigned char* copy_exti_base asm("s3") __attribute__((unused)) = (unsigned char*) EXTI;
+	register volatile unsigned char* copy_gpioc_base asm("s2") __attribute__((unused)) = (unsigned char*) GPIOC;
+	register volatile unsigned char* copy_exti_base asm("s3") __attribute__((unused)) = (unsigned char*) EXTI;
 	// combo register:
 	//   b31-b16 - Effectively a copy of the lower 16 bits of the MODER register (for controlling whether PD2 is a GPIO or Alt function (for SDIO)
 	//   b15-b8  - Current state of PD2. Either 04 for PD2=1, or 00 for PD2=0
 	//   b7-b0   - Current ROM slot register (updated when a 6502 write to FE05 occurs)
 	register uint32_t copy_combo_register asm("s4") __attribute__((unused)) = 0x00100000;
-	register unsigned char* copy_gpioa_base asm("s5") __attribute__((unused)) = (unsigned char*) GPIOA;
+	register volatile unsigned char* copy_gpioa_base asm("s5") __attribute__((unused)) = (unsigned char*) GPIOA;
 	register volatile uint8_t* copy_swram_high_base asm("s6") __attribute__((unused)) = (volatile uint8_t*) &swram_high_base;
 	register volatile uint8_t* copy_swram_low_base asm("s7") __attribute__((unused)) = (volatile uint8_t*) &swram_low_base;
 	// 5555 = d15-d8 outputs and 0010 is d2 out
 	register uint32_t copy_dataout_moder asm("s8") __attribute__((unused)) = 0x55550010;
+	register uint32_t copy_adc_data asm("s9") __attribute__((unused)) = 0x80000000;
 	// Use some of the high fpu registers as a sort of stack. eg. save r11 to s30 on ISR entry, then put it back on ISR exit
 	register volatile uint8_t* fake_stack_r11 asm("s30") __attribute__((unused));
 
@@ -611,6 +662,8 @@ int __attribute__((optimize("O0")))  main(void) {
 
 	SysTick->CTRL  = 0;
 
+	ADC_Config();
+
         memset(&fs32, 0, sizeof(FATFS));
 	
 	// Change to lazy mounting the SD card
@@ -618,13 +671,13 @@ int __attribute__((optimize("O0")))  main(void) {
 
 
 	if (res != FR_OK) {
-#ifdef ENABLE_SEMIHOSTING
+#ifdef SEMIHOSTING_SDCARD
 		printf("Failed to mount. Error = %d\n",res);
 #endif
 	   // TODO. Flash some LED or something if the SD card does not mount
 	   while (1);
 	} else {
-#ifdef ENABLE_SEMIHOSTING
+#ifdef SEMIHOSTING_SDCARD
 	   printf("mounted ok\n");
 #endif
 	}
@@ -633,15 +686,32 @@ int __attribute__((optimize("O0")))  main(void) {
 	scan_and_load_roms();
 	//f_mount(0, "1:", 1); // unmount
 
-#ifdef ENABLE_SEMIHOSTING
-	printf("Just before enabling the PC0 ISR\n");
-#endif
 	config_PC0_int();
 
+	int	check_adc_conversion_finished = 0;
+	uint16_t adc_value;
 	while(1) {
+		if (check_adc_conversion_finished) {
+			// check if conversion complete
+			if (ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC)) {
+				adc_value = ADC_GetConversionValue(ADC1);
+				// try to adjust the analog value at the extremes (in case the potentiometers in the joystick dont go all the way to 0 or 255)
+				if (adc_value < ADC_LOW_THRESHOLD) {
+					adc_value=0;
+				} else if (adc_value > ADC_HIGH_THRESHOLD) {
+					adc_value = 255;
+				}
+
+				// put adc value in lowest byte of s9. Clear b31 of s9 to say value available
+				// NB: We lose the channel id out of s9 at this point. Not the end of the world.
+    				__asm volatile ("mov r3,%[adc_value] \n bfc r3,#31,#1 \n vmov s9,r3 "::[adc_value] "r" (adc_value) : "r3");
+				check_adc_conversion_finished=0;
+			}
+		}
+
                 if (!(main_thread_command & 0xc0000000) && (main_thread_command & MAIN_THREAD_COMMANDS_MASK)) {
                         switch (main_thread_command & MAIN_THREAD_COMMANDS_MASK) {
-                           case (MAIN_THREAD_ROM_SWAP_COMMAND): {
+                           case (MAIN_THREAD_ROM_SWAP_COMMAND):
                                 // LOAD A NEW ROM INTO A SLOT
                                 main_thread_command |= 0x40000000;
 		
@@ -650,10 +720,20 @@ int __attribute__((optimize("O0")))  main(void) {
 				main_thread_command = 0x00000000;
 
                                 break;
-                           }
-			   default: {
+                           case (MAIN_THREAD_REQUEST_ADC_CONVERSION_COMMAND):
+                                main_thread_command |= 0x40000000;
+				// Start conversion of channel 2, or channel 3, or channel 4 etc.
+                		ADC_RegularChannelConfig(ADC1, (uint8_t) ((main_thread_command & 0x00000003)+2), 1, ADC_SampleTime_84Cycles);
+                		//ADC_RegularChannelConfig(ADC1, ADC_Channel_2, 1, ADC_SampleTime_84Cycles);
+    				ADC_SoftwareStartConv(ADC1);
+
+				check_adc_conversion_finished=1;
 				main_thread_command = 0x00000000;
-			   }
+				break;
+			   default: 
+				main_thread_command = 0x00000000;
+				break;
+			   
                         }
                 }
         }

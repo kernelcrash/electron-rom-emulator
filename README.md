@@ -77,6 +77,29 @@ Currently there are eight memory addresses that correspond to the 8 rom slots;
    &FC0F   - rom slot 15
 ```
 
+- Their are analog ports that operate like the Plus 1 joystick ports. They possibly operate
+a little differently:
+```
+   PA2 - Analog channel 1
+   PA3 - Analog channel 1
+   PA4 - Analog channel 1
+   PA5 - Analog channel 1
+
+   PC2 - Fire button (bit 4 when you read &FC72)
+   PC3 - Fire buton 2 (bit 5 when you read &FC72)
+```
+The analog ports are looking for a voltage between 0 and 3.3V. If you connect the centre pin
+of the joystick potentiometers to PA2 and PA3, and the other pins of the potentiometers to 
+GND and 3.3V (ie they just act as a simple voltage divider) then it should work. There are some
+settings in main.h that allow you to 'jump to the extremes' of the analog range in case your 
+joystick cannot go all the way to 0 or all the way to 255. For example, If you want any
+value less than 64 to return 0, and any value greater than 192 to return 255, then do this
+in main.h;
+```
+#define ADC_LOW_THRESHOLD 64
+#define ADC_HIGH_THRESHOLD 192
+```
+
 Wiring
 ======
 

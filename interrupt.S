@@ -11,6 +11,7 @@ reg_gpioa_base_s5	.req    s5
 reg_swram_high_base_s6	.req    s6
 reg_swram_low_base_s7	.req    s7
 reg_dataout_moder_s8	.req    s8
+reg_adcdata_s9		.req    s9
 reg_save_r11_s30	.req    s30
 
 
@@ -352,7 +353,7 @@ register_0xfe05:
 	databus_write_delay
         ldr     r0,[r2,C_TO_D_OFFSET+IDR] // GPIOD IDR
         lsrs    r0,r0,#8
-	bfi	r12,r0,#0,#4	// copy lowest 4 bits of r0 into r8 lowest 4 bits
+	bfi	r12,r0,#0,#4	// copy lowest 4 bits of r0 into r12 lowest 4 bits
 	vmov	reg_combo_s4,r12
 
 #ifdef DEBUG_FE05
@@ -384,6 +385,63 @@ register_0xfc0f:
 	str	r0,[r1]			// write the main thread command
 	unrolled_exit_EXTI0
 
+
+register_0xfc70:
+#ifdef DEBUG_FC70
+        vstr     s1,[r11,ODR]  // set PA0 high
+#endif
+        tst     r1,#0x0002      // see if r/w is low
+        beq	write_register_0xfc70
+// Must be a read of 0xfc70
+	vmov	r1,reg_adcdata_s9
+	lsls	r1,r1,#8	// bottom 8 bits of r1 into b15-8
+
+	lsrs	r0,r12,#8	// get PD2 state into lower 8 bits
+	bfi     r1,r0,#0,#8     //Copy bottom 8 bits of r0 into b7-b0 of r1
+	vmov	r0,reg_dataout_moder_s8
+        str     r1,[r2,C_TO_D_OFFSET+ODR] // GPIOD ODR
+        str     r0,[r2, C_TO_D_OFFSET+MODER]  // MODER set to outputs
+        
+	vmov	r3,reg_exti_base_s3
+        vstr     reg_one_s1,[r3,EMR]   // EXTI_EMR - wait for an event rather than an interrupt on PC0
+
+	lsrs    r1,r12,#16              // Move top half word of r8 into lower half of r1
+
+        dsb
+        sev     // set the event register
+        wfe     // clear the event register
+        wfe     // wait for negative edge
+
+	databus_read_extra_delay
+
+        str     r1,[r2, C_TO_D_OFFSET + MODER]  // MODER set to inputs
+	unrolled_exit_EXTI0
+write_register_0xfc70:
+	databus_write_delay
+        ldr     r0,[r2,C_TO_D_OFFSET+IDR] // GPIOD IDR
+        tst     r0,#0x0400  // b2 of databus. Must be high to initiate an ADC conversion
+	beq	exit_EXTI0
+	cmp	r0,#0x400
+	blt	exit_EXTI0
+	cmp	r0,#0x700
+	bgt	exit_EXTI0
+	vmov	r1,reg_adcdata_s9
+	orr	r1, #0x80000000		//set b31 high to indicate that the result is not ready
+
+        lsrs    r0,r0,#8	// move databus value into lower 8 bits
+	ands	r0,#3		// value should to 0 to 3 for ADC channels 0 to 3
+        bfi     r1,r0,#0,#2	// copy lowest two bits of r0 (the adc channel) into bits 1 and 0 of r1
+	vmov 	reg_adcdata_s9,r1	// s9 should be b31=1 and bits 1 and 0 with ADC channel
+
+	orr 	r0,#MAIN_THREAD_REQUEST_ADC_CONVERSION_COMMAND
+	ldr	r1,=main_thread_command
+	str	r0,[r1]			// write the main thread command
+
+#ifdef DEBUG_FC70
+        vstr     reg_zero_s0,[r11,ODR]  // set PA0 HIGH
+#endif
+
+	unrolled_exit_EXTI0
 
 // FC71 is the Electron Plus 1 printer out port
 register_0xfc71:
@@ -429,12 +487,19 @@ register_0xfc72:
         // D7 is ACK from the electrons perspective, but D15 to us. It is PC8
         //ldr   r6,[reg_gpioc_base,#0x10] // GPIOC IDR
 	// r1 is a read of port C which will have PC11 and PC12 and PC8. We only need PC8
+	lsrs	r3,r1,#2		// PC3 and PC2 shifted into bits 1 and 0 of r3 (fire buttons on joystick)
         ands    r1,r1,#0x0100
-        lsls    r1,r1,#7
+        lsls    r1,r1,#7	// PC8 gets shifted into b15 so that it will end up as b7 to the 6502
 	lsrs	r0,r12,#8	// get PD2 state into lower 8 bits
-        orr     r1,r1,r0   // add in PD2
+	bfi	r1,r0,#0,#8	// copy lowest 8 bits of r0 into lowest 8 bits of r1. Adds PD2 state in
+	bfi     r1,r3,#12,#2	// lowest two bits of r3 (fire buttons) shifted in to b13 (b5 on 650) and b12 (b4 on 6502)
 	vmov	r0,reg_dataout_moder_s8
-	orr	r1,#0x7000	// Make it look like the joystick button is not pressed
+	vmov	r3,reg_adcdata_s9
+	lsls	r3,r3,#1	// shift bit 31 into Carry
+	ITE	CC
+	bfccc   r1,#14,#1	// clear bit 14 (b6 on data bus) to say ADC conversion is complete
+	orrcs	r1,#0x4000	// set bit 14 (b6 on data bus) to say ADC conversion is not complete
+
         str     r1,[r2,C_TO_D_OFFSET+ODR] // GPIOD ODR
         str     r0,[r2, C_TO_D_OFFSET+MODER]  // MODER set to outputs
         //movs    r1,#1
@@ -450,9 +515,9 @@ register_0xfc72:
         dsb
         sev     // set the event register
         wfe     // clear the event register
-        wfe     // wait for the positive edge of _MREQ
+        wfe     // wait for negative edge
 
-	databus_read_extra_delay
+	//databus_read_extra_delay
 
         str     r1,[r2, C_TO_D_OFFSET + MODER]  // MODER set to inputs
 
