@@ -111,7 +111,7 @@ branchtable:
 	.short     ((register_unused - branchtable)/2) /* 0xfc6d */
 	.short     ((register_unused - branchtable)/2) /* 0xfc6e */
 	.short     ((register_unused - branchtable)/2) /* 0xfc6f */
-	.short     ((register_unused - branchtable)/2) /* 0xfc70 */
+	.short     ((register_0xfc70 - branchtable)/2) /* 0xfc70 */
 	.short     ((register_0xfc71 - branchtable)/2) /* 0xfc71 */
 	.short     ((register_0xfc72 - branchtable)/2) /* 0xfc72 */
 	.short     ((register_unused - branchtable)/2) /* 0xfc73 */

@@ -26,7 +26,7 @@
 
 /-------------------------------------------------------------------------*/
 
-#ifdef ENABLE_SEMIHOSTING
+#ifdef SEMIHOSTING_SDCARD
 #include <stdio.h>
 #endif
 #include "diskio.h"		/* Common include file for FatFs and disk I/O layer */
@@ -456,7 +456,7 @@ DSTATUS disk_initialize (
 	UINT tmr;
 	DSTATUS s;
 
-#ifdef ENABLE_SEMIHOSTING
+#ifdef SEMIHOSTING_SDCARD
 	printf("disk_initialize\n");
 #endif
 	if (drv) return RES_NOTRDY;
@@ -474,11 +474,11 @@ DSTATUS disk_initialize (
 
 	ty = 0;
 	if (send_cmd(CMD0, 0) == 1) {			/* Enter Idle state */
-#ifdef ENABLE_SEMIHOSTING
+#ifdef SEMIHOSTING_SDCARD
 		printf("CMD0 OK\n");
 #endif
 		if (send_cmd(CMD8, 0x1AA) == 1) {	/* SDv2? */
-#ifdef ENABLE_SEMIHOSTING
+#ifdef SEMIHOSTING_SDCARD
 			printf("CMD8 SDv2 OK\n");
 #endif
 			rcvr_mmc(buf, 4);							/* Get trailing return value of R7 resp */
@@ -493,7 +493,7 @@ DSTATUS disk_initialize (
 				}
 			}
 		} else {							/* SDv1 or MMCv3 */
-#ifdef ENABLE_SEMIHOSTING
+#ifdef SEMIHOSTING_SDCARD
 			printf("CMD8 SDv1 or MMCv3 OK\n");
 #endif
 			if (send_cmd(ACMD41, 0) <= 1) 	{
@@ -509,7 +509,7 @@ DSTATUS disk_initialize (
 				ty = 0;
 		}
 	}
-#ifdef ENABLE_SEMIHOSTING
+#ifdef SEMIHOSTING_SDCARD
 	 else {
 		printf("CMD0 failed\n");
 	}
@@ -544,7 +544,7 @@ DRESULT disk_read (
 {
 	BYTE cmd;
 
-#ifdef ENABLE_SEMIHOSTING
+#ifdef SEMIHOSTING_SDCARD
 	printf("disk_read %d %p %10d %d\n",drv,buff,sector,count);
 #endif
 
@@ -561,7 +561,7 @@ DRESULT disk_read (
 	}
 	
 	deselect();
-#ifdef ENABLE_SEMIHOSTING
+#ifdef SEMIHOSTING_SDCARD
 	printf("disk_read: count = %d\n",count);
 #endif
 	return count ? RES_ERROR : RES_OK;

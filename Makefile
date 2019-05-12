@@ -12,7 +12,7 @@ STLINK=~/stlink.git
 SRCS=ff.c ffunicode.c sdmm.c main.c system_stm32f4xx.c 
 
 # Library modules
-SRCS += stm32f4xx_syscfg.c misc.c stm32f4xx_gpio.c stm32f4xx_rcc.c stm32f4xx_usart.c stm32f4xx_exti.c stm32f4xx_pwr.c 
+SRCS += stm32f4xx_syscfg.c misc.c stm32f4xx_gpio.c stm32f4xx_rcc.c stm32f4xx_usart.c stm32f4xx_exti.c stm32f4xx_pwr.c stm32f4xx_adc.c
 #SRCS += stm32f4xx_tim.c 
 #SRCS += stm32f4_discovery.c
 
@@ -45,6 +45,8 @@ CFLAGS += -ffixed-s4
 CFLAGS += -ffixed-s5
 CFLAGS += -ffixed-s6
 CFLAGS += -ffixed-s7
+CFLAGS += -ffixed-s8
+CFLAGS += -ffixed-s9
 CFLAGS += -ffixed-s30
 
 
@@ -58,6 +60,7 @@ CFLAGS += -ffixed-s30
 #CFLAGS += -DDEBUG_FC72
 # If you board has an SD card slot with pullups, then set DISABLE_PULLUPS_FOR_SDCARD
 #CFLAGS += -DDISABLE_PULLUPS_FOR_SDCARD
+#CFLAGS += -DDEBUG_ADC
 #CFLAGS += -DENABLE_SEMIHOSTING
 
 # Include files from STM libraries
