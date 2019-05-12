@@ -431,6 +431,7 @@ void ADC_Config(void)
     ADC_Init(ADC1, &ADC_InitStruct);
     ADC_Cmd(ADC1, ENABLE);
 
+
 }
 
 uint16_t ADC_Read(int channel)
