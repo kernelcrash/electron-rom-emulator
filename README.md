@@ -77,13 +77,13 @@ Currently there are eight memory addresses that correspond to the 8 rom slots;
    &FC0F   - rom slot 15
 ```
 
-- Their are analog ports that operate like the Plus 1 joystick ports. They possibly operate
+- There are analog ports that operate like the Plus 1 joystick ports. They possibly operate
 a little differently:
 ```
    PA2 - Analog channel 1
-   PA3 - Analog channel 1
-   PA4 - Analog channel 1
-   PA5 - Analog channel 1
+   PA3 - Analog channel 2
+   PA4 - Analog channel 3
+   PA5 - Analog channel 4
 
    PC2 - Fire button (bit 4 when you read &FC72)
    PC3 - Fire buton 2 (bit 5 when you read &FC72)
