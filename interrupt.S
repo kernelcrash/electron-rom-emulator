@@ -425,8 +425,8 @@ write_register_0xfc70:
 	beq	exit_EXTI0
 	cmp	r0,#0x400
 	blt	exit_EXTI0
-	cmp	r0,#0x700
-	bgt	exit_EXTI0
+	cmp	r0,#0x800
+	bge	exit_EXTI0
 	vmov	r1,reg_adcdata_s9
 	lsls	r3,r1,#1		// b31 into Carry
 	bcs	exit_EXTI0		// exit if another conversion in progress
