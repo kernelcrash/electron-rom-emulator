@@ -11,8 +11,8 @@
 #define ADC_HIGH_THRESHOLD 255
 
 // If your joystick does not go full swing from 0 to 255, you might need these 'jump thresholds' to help
-##define ADC_LOW_THRESHOLD 64
-##define ADC_HIGH_THRESHOLD 192
+//#define ADC_LOW_THRESHOLD 64
+//#define ADC_HIGH_THRESHOLD 192
 
 #endif
 
