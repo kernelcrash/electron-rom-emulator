@@ -3,18 +3,18 @@ branchtable:
 	.short     ((register_unused - branchtable)/2) /* 0xfc01 */
 	.short     ((register_unused - branchtable)/2) /* 0xfc02 */
 	.short     ((register_unused - branchtable)/2) /* 0xfc03 */
-	.short     ((register_unused - branchtable)/2) /* 0xfc04 */
-	.short     ((register_unused - branchtable)/2) /* 0xfc05 */
-	.short     ((register_unused - branchtable)/2) /* 0xfc06 */
-	.short     ((register_unused - branchtable)/2) /* 0xfc07 */
+	.short     ((register_0xfc04 - branchtable)/2) /* 0xfc04 */
+	.short     ((register_0xfc05 - branchtable)/2) /* 0xfc05 */
+	.short     ((register_0xfc06 - branchtable)/2) /* 0xfc06 */
+	.short     ((register_0xfc07 - branchtable)/2) /* 0xfc07 */
 	.short     ((register_unused - branchtable)/2) /* 0xfc08 */
 	.short     ((register_unused - branchtable)/2) /* 0xfc09 */
 	.short     ((register_unused - branchtable)/2) /* 0xfc0a */
 	.short     ((register_unused - branchtable)/2) /* 0xfc0b */
-	.short     ((register_unused - branchtable)/2) /* 0xfc0c */
-	.short     ((register_unused - branchtable)/2) /* 0xfc0d */
-	.short     ((register_unused - branchtable)/2) /* 0xfc0e */
-	.short     ((register_unused - branchtable)/2) /* 0xfc0f */
+	.short     ((register_0xfc0c - branchtable)/2) /* 0xfc0c */
+	.short     ((register_0xfc0d - branchtable)/2) /* 0xfc0d */
+	.short     ((register_0xfc0e - branchtable)/2) /* 0xfc0e */
+	.short     ((register_0xfc0f - branchtable)/2) /* 0xfc0f */
 	.short     ((register_unused - branchtable)/2) /* 0xfc10 */
 	.short     ((register_unused - branchtable)/2) /* 0xfc11 */
 	.short     ((register_unused - branchtable)/2) /* 0xfc12 */
@@ -111,7 +111,7 @@ branchtable:
 	.short     ((register_unused - branchtable)/2) /* 0xfc6d */
 	.short     ((register_unused - branchtable)/2) /* 0xfc6e */
 	.short     ((register_unused - branchtable)/2) /* 0xfc6f */
-	.short     ((register_unused - branchtable)/2) /* 0xfc70 */
+	.short     ((register_0xfc70 - branchtable)/2) /* 0xfc70 */
 	.short     ((register_0xfc71 - branchtable)/2) /* 0xfc71 */
 	.short     ((register_0xfc72 - branchtable)/2) /* 0xfc72 */
 	.short     ((register_unused - branchtable)/2) /* 0xfc73 */
