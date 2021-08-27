@@ -174,14 +174,15 @@ enum sysclk_freq {
     SYSCLK_168_MHZ,
     SYSCLK_200_MHZ,
     SYSCLK_240_MHZ,
+    SYSCLK_250_MHZ,
 };
  
 void rcc_set_frequency(enum sysclk_freq freq)
 {
-    int freqs[]   = {42, 84, 168, 200, 240};
+    int freqs[]   = {42, 84, 168, 200, 240, 250};
  
     /* USB freqs: 42MHz, 42Mhz, 48MHz, 50MHz, 48MHz */
-    int pll_div[] = {2, 4, 7, 10, 10}; 
+    int pll_div[] = {2, 4, 7, 10, 10, 10}; 
  
     /* PLL_VCO = (HSE_VALUE / PLL_M) * PLL_N */
     /* SYSCLK = PLL_VCO / PLL_P */
@@ -241,6 +242,10 @@ void rcc_set_frequency(enum sysclk_freq freq)
             RCC_PCLK1Config(RCC_HCLK_Div4); /* 60MHz */
             RCC_PCLK2Config(RCC_HCLK_Div2); /* 120MHz */
             break;
+        case SYSCLK_250_MHZ:
+            RCC_PCLK1Config(RCC_HCLK_Div4); 
+            RCC_PCLK2Config(RCC_HCLK_Div2);
+            break;
     }
  
     /* Update SystemCoreClock variable */
@@ -287,8 +292,8 @@ void config_PC0_int(void) {
         /* Interrupt mode */
         EXTI_InitStruct.EXTI_Mode = EXTI_Mode_Interrupt;
         /* Triggers on rising and falling edge */
-        //EXTI_InitStruct.EXTI_Trigger = EXTI_Trigger_Rising;
-        EXTI_InitStruct.EXTI_Trigger = EXTI_Trigger_Falling;
+        EXTI_InitStruct.EXTI_Trigger = EXTI_Trigger_Rising;
+        //EXTI_InitStruct.EXTI_Trigger = EXTI_Trigger_Falling;
         /* Add to EXTI */
         EXTI_Init(&EXTI_InitStruct);
 
@@ -637,7 +642,7 @@ int __attribute__((optimize("O0")))  main(void) {
 	printf("Semi hosting on\n");
 #endif
 
-	rcc_set_frequency(SYSCLK_240_MHZ);
+	rcc_set_frequency(SYSCLK_250_MHZ);
 	  // switch on compensation cell
 	RCC->APB2ENR |= 0 |  RCC_APB2ENR_SYSCFGEN ;
 	SYSCFG->CMPCR |= SYSCFG_CMPCR_CMP_PD; // enable compensation cell

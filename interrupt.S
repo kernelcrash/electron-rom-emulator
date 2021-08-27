@@ -24,14 +24,8 @@ reg_save_r11_s30	.req    s30
 .endm
 
 .macro unrolled_exit_EXTI0
-        //movs    r1,#EXTI_Line0
-	//str	r1,[r10,IMR]
-
-	//ldr	r0,=EXTI0_tempvar
-	//str	r1,[r0]
 	dsb
 #if defined(DEBUG_EXTI0_END) || defined(DEBUG_EXTI0_ROM_ACCESS) || defined(DEBUG_EXTI0_SWRAM_WRITE)
-        //movs    r0,#1
         vstr     reg_one_s1,[r11,ODR]
 #endif
 #ifdef DEBUG_OUTPUT_ON_GPIOA
@@ -40,14 +34,8 @@ reg_save_r11_s30	.req    s30
 	bx	lr
 .endm
 
-.macro databus_write_delay
-	.rept 10
-		nop
-	.endr
-.endm
-
 .macro databus_read_extra_delay
-	.rept 8
+	.rept 1
         	nop
 	.endr
 .endm
@@ -220,47 +208,31 @@ main_thread_data:
 
 .section .text
 
-// THETA0 Handler. Int on -ve edge
+// PHI0 Handler. Int on +ve edge
 
 .type EXTI0_IRQHandler, %function
 EXTI0_IRQHandler:
-// You need to at least add DEBUG_OUTPUT_ON_GPIOA in the Makefile to see debug output on PA0
+// This DEBUG output stuff is unlikely to work on the +ve edge version as the timing is too tight.
 #ifdef DEBUG_OUTPUT_ON_GPIOA
 	vmov	reg_save_r11_s30,r11		// effectively s30 is our 'stack'
 	vmov r11,reg_gpioa_base_s5
 #endif
 #ifdef DEBUG_EXTI0_START
-        //movs    r0,#0
         vstr     reg_zero_s0,[r11,ODR]
 #endif
 	
 	vmov	r12,reg_combo_s4		// r12 = combo bits
-	//lsrs	r0,r12,#16		// Move top half word of r12 into lower half of r0
-	//movt	r0,#0x5555		// So should be 55550020 in SDIO mode, 55550010 in GPIO mode
-	//vmov	reg_dataout_moder_s7,r0
 
 	vmov	r3,reg_exti_base_s3		// r3 = EXTI
 	vstr	reg_one_s1,[r3,PR]	// clear interrupt
 
-	//ldr	r0,=swram_high_base
-	//vmov	s6,r0		// should be able to compute this from main thread
-
 	vmov	r2,reg_gpioc_base_s2
-wait_for_phi0_high:
-	movs	r3,#1
-2:	ldr	r0,[r2, C_TO_E_OFFSET+IDR]
-	ldr	r1,[r2,IDR]
-	tst	r1,r3
-	beq	2b
+	ldr	r0,[r2, C_TO_E_OFFSET+IDR]	// grab address bus
+	ldr	r1,[r2,IDR]			// grab state of phi0 and r/_w
 
 phi0_high:
 	lsls	r3,r0,#17	// A15 -> C
-	bcs	upper_32k	
-
-	// We fall through to the exit here because when we get the chance to exit the ISR we really really want to exit quickly to give time back to the main thread
-exit_EXTI0:
-	unrolled_exit_EXTI0
-
+	bcc	exit_EXTI0
 
 upper_32k:
 	bmi	process_registers		// A15 = 1 and A14 = 1
@@ -288,43 +260,40 @@ upper_32k:
         str     r1,[r2, C_TO_D_OFFSET + ODR] // GPIOD ODR
         str     r0,[r2, C_TO_D_OFFSET + MODER]  // MODER set to outputs
 
-	//movs	r1,#1
-	vmov	r3,reg_exti_base_s3
-        vstr     reg_one_s1,[r3,EMR]   // EXTI_EMR - wait for an event rather than an interrupt on PC0
-
-
         lsrs    r1,r12,#16              // Move top half word of r12 into lower half of r1, and also leave top 16 bits as zero (ie. Data IN mode)
 	
-	dsb
-        sev     // set the event register
-        wfe     // clear the event register
-// So the 2nd wfe is meant to wait for the -ve edge, but if you get a spurious edge at exactly the time these instructions execute, it can slip through without waiting
-        wfe     // wait for -ve edge of phi0
-
+1$:	ldr     r0,[r2,IDR]                     // grab state of phi0 and r/_w
+	tst     r0,#0x0001
+#ifdef ENABLE_EXTRA_READ_DELAY
 	databus_read_extra_delay
+        IT     EQ
+	streq     r1,[r2, C_TO_D_OFFSET + MODER]  // MODER set to inputs
+#else
+	IT      EQ
+	streq     r1,[r2, C_TO_D_OFFSET + MODER]  // MODER set to inputs
+#endif
 
-        str     r1,[r2, C_TO_D_OFFSET + MODER]  // MODER set to inputs
+	bne     1$
 
 #ifdef DEBUG_EXTI0_ROM_ACCESS
         vstr     reg_one_s1,[r11,ODR]
         vstr     reg_zero_s0,[r11,ODR]
 #endif
 
-	b	wait_for_phi0_high
+exit_EXTI0:
+	unrolled_exit_EXTI0
 
 
 write_sideways_ram:
 #ifdef DEBUG_EXTI0_SWRAM_WRITE
         vstr     reg_zero_s0,[r11,ODR]
 #endif
-	databus_write_delay
 
 	ldr	r1,[r2,C_TO_D_OFFSET+IDR]     // GPIOD read databus
 	lsrs	r1,r1,#8
 	strb	r1,[r3,r0]
 
 	unrolled_exit_EXTI0
-	//b	wait_for_phi0_high		// We should probably exit here, as phi0 is probably already high
 
 
 
@@ -350,7 +319,6 @@ register_0xfe05:
 #endif
         tst     r1,#0x0002      // see if r/w is low
         bne     exit_EXTI0
-	databus_write_delay
         ldr     r0,[r2,C_TO_D_OFFSET+IDR] // GPIOD IDR
         lsrs    r0,r0,#8
 	bfi	r12,r0,#0,#4	// copy lowest 4 bits of r0 into r12 lowest 4 bits
@@ -373,8 +341,6 @@ register_0xfc0f:
 	ands	r3,r0,#0x0f		// get rom number based on the address bus
         tst     r1,#0x0002      // see if r/w is low
         bne     exit_EXTI0
-
-	databus_write_delay
 
         ldr     r0,[r2,C_TO_D_OFFSET+IDR] // GPIOD IDR
         lsrs    r0,r0,#8		// r0 has rom to swap to
@@ -409,17 +375,21 @@ register_0xfc70:
 
 	lsrs    r1,r12,#16              // Move top half word of r8 into lower half of r1
 
-        dsb
-        sev     // set the event register
-        wfe     // clear the event register
-        wfe     // wait for negative edge
-
+1$:	ldr     r0,[r2,IDR]                     // grab state of phi0 and r/_w
+	tst     r0,#0x0001
+#ifdef ENABLE_EXTRA_READ_DELAY
 	databus_read_extra_delay
+        IT     EQ
+	streq     r1,[r2, C_TO_D_OFFSET + MODER]  // MODER set to inputs
+#else
+	IT      EQ
+	streq     r1,[r2, C_TO_D_OFFSET + MODER]  // MODER set to inputs
+#endif
+	bne     1$
 
-        str     r1,[r2, C_TO_D_OFFSET + MODER]  // MODER set to inputs
 	unrolled_exit_EXTI0
+
 write_register_0xfc70:
-	databus_write_delay
         ldr     r0,[r2,C_TO_D_OFFSET+IDR] // GPIOD IDR
         tst     r0,#0x0400  // b2 of databus. Must be high to initiate an ADC conversion
 	beq	exit_EXTI0
@@ -458,7 +428,6 @@ register_0xfc71:
 // MOSI is D0, SCK is D1 from the Electrons perspective. These come in on D8 and D9 for us.
 // MOSI needs to go out as PD2. SCK goes out as PC12 and we need to keep PC11 low for CS/
         movs    r3,#0
-	databus_write_delay
         ldr     r0,[r2,C_TO_D_OFFSET+IDR] // GPIOD IDR
         tst     r0,#0x0100  // PD8
 	ITE	NE
@@ -507,25 +476,20 @@ register_0xfc72:
 
         str     r1,[r2,C_TO_D_OFFSET+ODR] // GPIOD ODR
         str     r0,[r2, C_TO_D_OFFSET+MODER]  // MODER set to outputs
-        //movs    r1,#1
-	vmov	r3,reg_exti_base_s3
-        vstr     reg_one_s1,[r3,EMR]   // EXTI_EMR - wait for an event rather than an interrupt on PC0
 
-        //movs    r0,#1
-
-        //movs    r1,#DATA_IN_MODE
 	lsrs    r1,r12,#16              // Move top half word of r8 into lower half of r1
-	//movt	r1,#0			// Again not entirely necessary
 
-        dsb
-        sev     // set the event register
-        wfe     // clear the event register
-        wfe     // wait for negative edge
-
-	//databus_read_extra_delay
-
-        str     r1,[r2, C_TO_D_OFFSET + MODER]  // MODER set to inputs
-
+1$:	ldr     r0,[r2,IDR]                     // grab state of phi0 and r/_w
+	tst     r0,#0x0001
+#ifdef ENABLE_EXTRA_READ_DELAY
+	databus_read_extra_delay
+        IT     EQ
+	streq     r1,[r2, C_TO_D_OFFSET + MODER]  // MODER set to inputs
+#else
+	IT      EQ
+	streq     r1,[r2, C_TO_D_OFFSET + MODER]  // MODER set to inputs
+#endif
+	bne     1$
 
 	unrolled_exit_EXTI0
 
