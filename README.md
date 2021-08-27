@@ -201,19 +201,22 @@ stm32f4 must keep data on the data bus a 'little while longer'. Maybe
 is a define in the Makefile that you can uncomment to add a bit more 
 delay. If you uncomment the ENABLE_EXTRA_READ_DELAY
 
+```
 CFLAGS += -DENABLE_EXTRA_READ_DELAY
+```
 
 it should add an extra 4 or 5ns of delay in. If you need to add more, 
 find the 'databus_extra_ready_delay macro in interrupt.S and increase
 the number next to .rept. If its '1' then you get an extra 4 or 5ns
 delay. If its 2, you get 8 or 10ns. I would not increase it above 1 or 2.
 
+```
 .macro databus_read_extra_delay
         .rept 1
                 nop
         .endr
 .endm
-
+```
 
 
 
