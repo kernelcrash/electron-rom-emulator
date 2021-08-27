@@ -3,6 +3,18 @@ Electron ROM Emulator
 kernel at kernelcrash dot com
 More details on this at www.kernelcrash.com
 
+EXPERIMENTAL POSITIVE EDGE TRIGGERED VERSION
+============================================
+
+In this version, the main EXTI0 interrupt code on the stm32f4 occurs on a positive edge
+of phi0, rather than the negative edge like the previous version of the code. The negative
+edge triggered version allowed more time for the intterrupt code, but I found there were 
+edge cases where the stm32f4 could get stuck in the interrupt routine due to a tight
+loop running out of ROM that never accessed RAM or wrote to a peripheral register. By 
+interrupting on the positive edge we can no longer 'get stuck in the intterupt handler', 
+and will always give a small amount of time back to the main loop. More details in the 
+Technical section.
+
 Overview
 ========
 
@@ -149,6 +161,65 @@ and should not have a level converter between the stm32f407 and the card.
 Technical
 =========
 
+The Positive Edge version
+-------------------------
+
+This version connects the PC0 line of the stm32f4 to the Phi0 signal 
+of the Electron. Phi0 is the clock of the Electron. It is mostly going at 
+2MHz (low for 250ns, high for 250ns), but will slow down when accessing 
+RAM or a peripheral (the high part of the clock is stretched to make it 
+more like a 1MHz cycle).
+
+The stm32f4 interrupts on the rising edge of Phi0. Not long after Phi0
+goes high the address bus is guaranteed to be stable. The Electron's
+address bus is connected to port E of the stm32f4. The Electron can 
+have multiple ROMs bank switched in and out at 0x8000 to 0xBFFF. This
+is controlled by a peripheral register at 0xFE05. In general, the stm32f4
+is watching for a read in the 0x8000 to 0xBFFF range, and checking the 
+state of the 0xFE05 register. If the 0xFE05 register is 4, 5, 6, 7 or 
+12, 13, 14, 15 then the stm32f4 will try to present a byte to the 
+data bus of the Electron BEFORE  Phi0 goes low. In this 'positive
+edge' version timing is incredibly tight. As there is a lag of perhaps 
+100 to 150ns from the positive going edge of Phi0 and the first line
+of the interrupt handler executing, we have 'less than 100ns' to 
+determine what action is required and present a byte to the Electron.
+In the previous version of the code that interrupted on the negative
+edge of Phi0, once data was presented to the Electron, WFE and DSB 
+instructions were used to stall the ARM processor until the negative
+edge of Phi0. That turns out to not be possible in this version.
+
+The code does other things other than reading from a ROM, but in all
+those other cases the timing is less restrictive. Examples of this are
+'writing to sideways RAM', reading or writing to simulated peripheral
+registers (which includes the the 0xFE05 bank switch register and the 
+0xFC71 and 0xFC72 locations used by the Plus 1 ... which are passed
+though to the SDCARD and hence allow MMFS to access an SDCARD)
+
+One thing to note is that after Phi0 goes low (negative edge), the 
+stm32f4 must keep data on the data bus a 'little while longer'. Maybe 
+10 or 20ns extra. I think the code already achieves that, but there
+is a define in the Makefile that you can uncomment to add a bit more 
+delay. If you uncomment the ENABLE_EXTRA_READ_DELAY
+
+CFLAGS += -DENABLE_EXTRA_READ_DELAY
+
+it should add an extra 4 or 5ns of delay in. If you need to add more, 
+find the 'databus_extra_ready_delay macro in interrupt.S and increase
+the number next to .rept. If its '1' then you get an extra 4 or 5ns
+delay. If its 2, you get 8 or 10ns. I would not increase it above 1 or 2.
+
+.macro databus_read_extra_delay
+        .rept 1
+                nop
+        .endr
+.endm
+
+
+
+
+The sections below refer to older version of the code. 
+------------------------------------------------------
+ 
 An older version of this program sat in a tight timing loop watching the
 phi0 output of the Electron. Phi0 is effectively the clock for the Electron.
 It is 'mostly 2MHz' but will slow down when accessing peripherals or RAM.
@@ -159,12 +230,12 @@ the STM32's flash rom, left it long enough on the databus for the 6502
 to read it, then quickly tri-stated the databus again ... and waited for 
 next rising edge of phi0.
 
-This newer interrupt version connects phi0 to an interrupt on the STM32.
+Then I did a version that connects phi0 to an interrupt on the STM32.
 Rather than interrupt on the rising edge of phi0 when the address bus 
 would be known to be stable, the interrupt occurs on the negative edge
 of phi0 which is effectively the end of the previous cycle.
 
-The reason for doing this is that it takes time to respond to an interrupt,
+The reason for doing it this way is that it takes time to respond to an interrupt,
 so the latency between an 'edge' that causes an interrupt and the first
 executing line of an interrupt service routine (ISR) is at least 100ns, 
 but more like 150ns ... but can be higher. If the first executing line of 
