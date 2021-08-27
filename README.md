@@ -8,10 +8,10 @@ EXPERIMENTAL POSITIVE EDGE TRIGGERED VERSION
 
 In this version, the main EXTI0 interrupt code on the stm32f4 occurs on a positive edge
 of phi0, rather than the negative edge like the previous version of the code. The negative
-edge triggered version allowed more time for the intterrupt code, but I found there were 
+edge triggered version allowed more time for the interrupt code, but I found there were 
 edge cases where the stm32f4 could get stuck in the interrupt routine due to a tight
 loop running out of ROM that never accessed RAM or wrote to a peripheral register. By 
-interrupting on the positive edge we can no longer 'get stuck in the intterupt handler', 
+interrupting on the positive edge we can no longer 'get stuck in the interupt handler', 
 and will always give a small amount of time back to the main loop. More details in the 
 Technical section.
 
