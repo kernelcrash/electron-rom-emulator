@@ -223,22 +223,22 @@ branchtable:
 	.short     ((register_unused - branchtable)/2) /* 0xfcdd */
 	.short     ((register_unused - branchtable)/2) /* 0xfcde */
 	.short     ((register_unused - branchtable)/2) /* 0xfcdf */
-	.short     ((register_unused - branchtable)/2) /* 0xfce0 */
-	.short     ((register_unused - branchtable)/2) /* 0xfce1 */
-	.short     ((register_unused - branchtable)/2) /* 0xfce2 */
-	.short     ((register_unused - branchtable)/2) /* 0xfce3 */
-	.short     ((register_unused - branchtable)/2) /* 0xfce4 */
-	.short     ((register_unused - branchtable)/2) /* 0xfce5 */
-	.short     ((register_unused - branchtable)/2) /* 0xfce6 */
-	.short     ((register_unused - branchtable)/2) /* 0xfce7 */
-	.short     ((register_unused - branchtable)/2) /* 0xfce8 */
-	.short     ((register_unused - branchtable)/2) /* 0xfce9 */
-	.short     ((register_unused - branchtable)/2) /* 0xfcea */
-	.short     ((register_unused - branchtable)/2) /* 0xfceb */
-	.short     ((register_unused - branchtable)/2) /* 0xfcec */
-	.short     ((register_unused - branchtable)/2) /* 0xfced */
-	.short     ((register_unused - branchtable)/2) /* 0xfcee */
-	.short     ((register_unused - branchtable)/2) /* 0xfcef */
+	.short     ((register_0xfcex - branchtable)/2) /* 0xfce0 */
+	.short     ((register_0xfcex - branchtable)/2) /* 0xfce1 */
+	.short     ((register_0xfcex - branchtable)/2) /* 0xfce2 */
+	.short     ((register_0xfcex - branchtable)/2) /* 0xfce3 */
+	.short     ((register_0xfcex - branchtable)/2) /* 0xfce4 */
+	.short     ((register_0xfcex - branchtable)/2) /* 0xfce5 */
+	.short     ((register_0xfcex - branchtable)/2) /* 0xfce6 */
+	.short     ((register_0xfcex - branchtable)/2) /* 0xfce7 */
+	.short     ((register_0xfcex - branchtable)/2) /* 0xfce8 */
+	.short     ((register_0xfcex - branchtable)/2) /* 0xfce9 */
+	.short     ((register_0xfcex - branchtable)/2) /* 0xfcea */
+	.short     ((register_0xfcex - branchtable)/2) /* 0xfceb */
+	.short     ((register_0xfcex - branchtable)/2) /* 0xfcec */
+	.short     ((register_0xfcex - branchtable)/2) /* 0xfced */
+	.short     ((register_0xfcex - branchtable)/2) /* 0xfcee */
+	.short     ((register_0xfcex - branchtable)/2) /* 0xfcef */
 	.short     ((register_unused - branchtable)/2) /* 0xfcf0 */
 	.short     ((register_unused - branchtable)/2) /* 0xfcf1 */
 	.short     ((register_unused - branchtable)/2) /* 0xfcf2 */

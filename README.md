@@ -3,6 +3,41 @@ Electron ROM Emulator
 kernel at kernelcrash dot com
 More details on this at www.kernelcrash.com
 
+TIM/TUBE updates
+================
+
+A couple of key changes from previous versions
+
+- The previous version used to have PHI0 interrupting the STM32F4 on a negative edge then waiting for PHI0 to go high, check the address bus and exit quickly if the memory access was unrelated to a ROM or IO register that the board was emulating. That 'exit quickly' was meant to 'give time back to the main.c main while loop that manages some disk access and the joystick control. Under seemingly rare circumstances you could starve the main loop of any time if say you had a tight loop executing from ROM.
+- The new idea is to have a one shot timer trigger when PHI0 goes low. The one shot is configured to fire a +ve going pulse that is tied to an EXTI line. This means we can interrupt the STM32F4 some time between the -ve edge of PHI0 and the +ve edge. Because it takes about 100ns from the interrupt trigger to the STM32F4 actually executing any EXTI code, we can adjust the timing such that the first line of our EXTI code executes close to the +ve edge of PHI0. The net effect is that we give more time back to the main loop on every cycle. The way this is wired is that PHI0 is still connected to PC0, but we also connect PHI0 to PB7 (the input to the timer). The one shot output PB6 is then tied to PC4 which is now the EXTI interrupt (we no longer interrupt on PC0).
+- The previous version used WFE to wait for a PHI0 cycle to end. I've gone back to just using a tight loop ldr/tst/bne loop as we need to wait a a few nanoseconds after the end of the cycle before tri-stating anyway.
+- I now generate a chip select signal for 0xFCEx on PB0. This is so you can wire in a 40 pin tube connector and hook up a pitubedirect. Note, I found the 74LVC245 tranceivers and the stm32f407 don't exactly like each other, and on the pitubedirect I'd suggest putting series resistors on the datalines (similar to the pitubedirect kits for the BBC Master). I put 270 ohm resistors on each data line
+
+
+TIM Version
+===========
+
+Basic idea is to have the benfefits of positive edge triggering on phi0 but using
+a one-shot pulse off the negative edge in order to factor in the 100ns delay before
+the EXTI handler kicks in. ie. the EXTI interrupt is no longer off the +ve edge of 
+phi0 but a sort of preemptive +ve edge created from the one-shot.
+
+phi0 is connected to both PC0 and PB7.
+PC0 is just a GPIO input. 
+PB7 is an edge trigger that kicks off a one-pulse timer in TIM4. It triggers on the -ve edge of phi0 
+at the end of a 6502 bus clock cycle.
+The one-pulse is output on PB6 as a +ve going pulse that occurs about 150ns into the low part of phi0.
+PB6 is tied to PC4 which is configure as an EXTI4 external interrupt.
+The EXTI4 interrupt handler will execute its first line about 100ns after the one-pulse
+goes high. Given that phi0 is low for about 250ns, that means the EXTI4 handler is 
+executing just after phi0 actually goes high. So that means the code can read the 
+address bus, data bus, and read/write and start to process it.
+
+For the cycles where the EXTI4 handler needs to wait till the falling edge
+of phi0, we just loop looking for it go low. In prior testing this seems
+more reliable than waiting got a -ve edge using WFE.
+
+
 Overview
 ========
 
@@ -100,10 +135,12 @@ in main.h;
 #define ADC_HIGH_THRESHOLD 192
 ```
 
+- You can wire in a 40 pin TUBE interface. Most pins are connected directly to the Electron expansion connector. However, we generate the TUBE chip select on PB0 (which goes to pin 8 of the TUBE 40 pin connector).
+
 Wiring
 ======
 
-- Wiring from the 50 pin edge connector on the Electron to the STM42F407VET6 board is as follows
+- Wiring from the 50 pin edge connector on the Electron to the STM42F407VET6 board is as follows. This does not include the connections for the TUBE interface. Look further down for details of the TUBE connection.
 ```
 	   BOTTOM	TOP (towards the AC INPUT)
 
@@ -146,6 +183,48 @@ Wiring
 Obviously connect the GND's up and remember that the SD card runs at 3.3V
 and should not have a level converter between the stm32f407 and the card.
 
+For the TIM timer stuff you also need these connections on the STM32F407 
+board itself:
+```
+   PC0 -> PB7
+   PB6 -> PC4
+```
+
+TUBE Wiring
+===========
+If you add on the optional TUBE interface you will need to wire the
+40 pin TUBE connector like so (p18 means pin 18 on the Electron
+expansion connector)
+```
+GND     1	2  R/_W (p18)
+GND     3   4  PHI0 (p14)
+GND     5   6  TIRQ (not connected)
+GND     7   8  TTUBE (goes to PB0)
+GND     9  10  _RST (p15)
+GND    11  12  D0 (p26)
+GND    13  14  D1 (p25)
+GND    15  16  D2 (p24)
+GND    17  18  D3 (p23)
+GND    19  20  D4 (p22)
+GND    21  22  D5 (p21)
+GND    23  24  D6 (p20)
+GND    25  26  D7 (p19)
+GND    27  28  A0 (p38)
+GND    29  30  A1 (p39)
+(?)    31  32  A2 (p40)
+(?)    33  34  A3 (p41)
+(?)    35  36  A4 (not connected)
+(?)    37  38  A5 (not connected)
+(?)    39  40  A6 (not connected)
+```
+The  pins marked (?) are the +5V pins of the TUBE connector. If you connect 
+them to +5V on the Electron, effectively you are using the Electron PSU to
+power the Electron and the pitubedirect including a Raspberry Pi ... and that
+might 'just work' for an original Raspberry Pi Zero, but any other Pi will 
+use too much power. I'd suggest leaving these (?) pins disconnected and to
+connect a seperate power source to the raspberry pi.
+
+
 Technical
 =========
 
@@ -161,8 +240,14 @@ next rising edge of phi0.
 
 This newer interrupt version connects phi0 to an interrupt on the STM32.
 Rather than interrupt on the rising edge of phi0 when the address bus 
-would be known to be stable, the interrupt occurs on the negative edge
-of phi0 which is effectively the end of the previous cycle.
+would be known to be stable, we use a TIM timer one shot such that;
+
+- The TIM timer one shot is triggered on PB7 by the negative edge of PHI0
+- The one shot output (PB6) goes +ve after about 150ns. That then fires
+  the EXTI4 interrupt on PC4.
+- It takes about 100ns before we get to the first line of our EXTI4 handler.
+  Because PHI0 is typically low for about 250ns, that means we arrive at
+  out executable EXTI code 'just' as PHI0 is going high.
 
 The reason for doing this is that it takes time to respond to an interrupt,
 so the latency between an 'edge' that causes an interrupt and the first
@@ -171,13 +256,11 @@ but more like 150ns ... but can be higher. If the first executing line of
 the ISR occurred 150ns after the positive edge, then it would be too 
 late to do anything useful (the 100ns or so left is not a lot of instructions).
 
-So we interrupt on the negative edge and the ISR routine goes like this;
+So in the EXTI4 handler (ISR)
 
- - The first line of the ISR is maybe 100 - 150ns later in the low part
-of phi0
  - We poll for phi0 going high. While we are polling we are also grabbing
    the address on the address bus and the state of the 6502 read/_write 
-   line.
+   line. This is really a 'double check'.
  - Once we detect phi0 high, we look at the address bus and read/_write
    line to try to figure out whether its a memory access for our sideways
    ram slots or some of the IO registers in a 'Plus 1' that we are
@@ -202,11 +285,8 @@ of phi0
 
      - because we are in an ISR routine this falling edge does
        not cause another interrupt.
-     - We don't exit the ISR. Effectively we 'loop round' and
-       watch for the next positive edge. We don't end iup looping
-       around forever as we will eventually hit a RAM access or
-       upper ROM/peripherals access that will allow us to exit
-       the ISR.
+     - We exit the ISR to give some time back to the main loop in
+       main.c
 
 Still this is a miniscule amount of time to service an interrupt. Key stuff:
 
@@ -299,7 +379,7 @@ relevant slot labels in  roms-preloaded-from-flash.S
       slot_4_base:
         .incbin "roms/ESWMMFS.rom"
       slot_5_base:
-        .incbin "roms/AP6v130ta.rom"
+        .incbin "roms/AP6v133t.rom"
       slot_6_base:
         //.incbin "roms/blank.rom"
       slot_7_base:
@@ -309,9 +389,11 @@ relevant slot labels in  roms-preloaded-from-flash.S
 Obviously 'make' and flash the hex file to the stm32f407 board to use these. (you might need
 to do a 'make clean' then 'make')
 
-For reference the AP6v130ta.rom referred to above is the 16K AP6 rom from 
-http://mdfs.net/Software/BBC/SROM/Plus1/ . That will give you a *ROMS
-command as well as various sideways ram load/save commands. I often put this as rom 13.
+For reference the AP6v133t.rom referred to above is the 16K AP6 rom from 
+http://mdfs.net/Software/BBC/SROM/Plus1/ . I had to download it, note that it is only 16067 bytes
+long, then use dd to add another 317 bytes to it, to pad it out to 16384 bytes. The AP6 rom
+will give you a *ROMS command as well as various sideways ram load/save commands. I often put this
+as rom 13.
 
 - The flash accelerator had some problems in early stm32f4 chips. Find this line in main.c:
 ```

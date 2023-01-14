@@ -13,6 +13,7 @@ SRCS=ff.c ffunicode.c sdmm.c main.c system_stm32f4xx.c
 
 # Library modules
 SRCS += stm32f4xx_syscfg.c misc.c stm32f4xx_gpio.c stm32f4xx_rcc.c stm32f4xx_usart.c stm32f4xx_exti.c stm32f4xx_pwr.c stm32f4xx_adc.c
+SRCS += stm32f4xx_tim.c timer.c
 #SRCS += stm32f4xx_tim.c 
 #SRCS += stm32f4_discovery.c
 
@@ -51,8 +52,8 @@ CFLAGS += -ffixed-s30
 
 
 # NB: You have to have DEBUG_OUPUT_ON_GPIOA set in order to see any output on PA0
-#CFLAGS += -DDEBUG_OUTPUT_ON_GPIOA
-#CFLAGS += -DDEBUG_EXTI0_START -DDEBUG_EXTI0_END
+CFLAGS += -DDEBUG_OUTPUT_ON_GPIOA
+CFLAGS += -DDEBUG_EXTI0_START -DDEBUG_EXTI0_END
 #CFLAGS += -DDEBUG_EXTI0_ROM_ACCESS
 #CFLAGS += -DDEBUG_EXTI0_SWRAM_WRITE
 #CFLAGS += -DDEBUG_FE05

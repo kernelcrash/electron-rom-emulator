@@ -5,6 +5,7 @@
 
 #include "ff.h"
 #include "diskio.h"
+#include "timer.h"
 
 
 
@@ -247,54 +248,31 @@ void rcc_set_frequency(enum sysclk_freq freq)
     SystemCoreClockUpdate();
 }
 
-//void SD_NVIC_Configuration(FunctionalState state)
-//{
-//        NVIC_InitTypeDef NVIC_InitStructure;
-//
-//        /* Configure the NVIC Preemption Priority Bits */
-//        //NVIC_PriorityGroupConfig(NVIC_PriorityGroup_1);
-//        //NVIC_PriorityGroupConfig(NVIC_PriorityGroup_4);
-//
-//        NVIC_InitStructure.NVIC_IRQChannel = SDIO_IRQn;
-//        //NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
-//        NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 2;    // This must be a lower priority (ie. higher number) than the phi0 int
-//        NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
-//        NVIC_InitStructure.NVIC_IRQChannelCmd = state;
-//        NVIC_Init(&NVIC_InitStructure);
-//}
-//
-//
-//
-//void SDIO_IRQHandler(void)
-//{
-//  /* Process All SDIO Interrupt Sources */
-//  SD_ProcessIRQSrc();
-//}
 
-// _IORQ interrupt
-void config_PC0_int(void) {
+// PC4 is triggered by the TIM4 one pulse
+void config_PC4_int(void) {
         EXTI_InitTypeDef EXTI_InitStruct;
         NVIC_InitTypeDef NVIC_InitStruct;
 
         /* Enable clock for SYSCFG */
         RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG, ENABLE);
 
-        SYSCFG_EXTILineConfig(EXTI_PortSourceGPIOC, EXTI_PinSource0);
+        SYSCFG_EXTILineConfig(EXTI_PortSourceGPIOC, EXTI_PinSource4);
 
-        EXTI_InitStruct.EXTI_Line = EXTI_Line0;
+        EXTI_InitStruct.EXTI_Line = EXTI_Line4;
         /* Enable interrupt */
         EXTI_InitStruct.EXTI_LineCmd = ENABLE;
         /* Interrupt mode */
         EXTI_InitStruct.EXTI_Mode = EXTI_Mode_Interrupt;
         /* Triggers on rising and falling edge */
-        //EXTI_InitStruct.EXTI_Trigger = EXTI_Trigger_Rising;
-        EXTI_InitStruct.EXTI_Trigger = EXTI_Trigger_Falling;
+        EXTI_InitStruct.EXTI_Trigger = EXTI_Trigger_Rising;
+        //EXTI_InitStruct.EXTI_Trigger = EXTI_Trigger_Falling;
         /* Add to EXTI */
         EXTI_Init(&EXTI_InitStruct);
 
         /* Add IRQ vector to NVIC */
-        /* PC0 is connected to EXTI_Line0, which has EXTI0_IRQn vector */
-        NVIC_InitStruct.NVIC_IRQChannel = EXTI0_IRQn;
+        /* PC4 is connected to EXTI_Line4, which has EXTI4_IRQn vector */
+        NVIC_InitStruct.NVIC_IRQChannel = EXTI4_IRQn;
         /* Set priority */
         NVIC_InitStruct.NVIC_IRQChannelPreemptionPriority = 0x00;
         /* Set sub priority */
@@ -355,9 +333,9 @@ void config_gpio_data(void) {
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;
 	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
-	//GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
+	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
 	//GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_DOWN;
-	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
+	//GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
 	GPIO_Init(GPIOD, &GPIO_InitStructure);
 
 	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_2 ;
@@ -385,10 +363,29 @@ void config_gpio_addr(void) {
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN;
 	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
 	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
-	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_DOWN;
+	//GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_DOWN;
+	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
 	GPIO_Init(GPIOE, &GPIO_InitStructure);
 }
 
+
+void config_gpio_portb(void) {
+	GPIO_InitTypeDef  GPIO_InitStructure;
+	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOB, ENABLE);
+
+	/* Configure GPIO Settings */
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_0;
+
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
+	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
+	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
+	//GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_DOWN;
+	//GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
+	GPIO_Init(GPIOB, &GPIO_InitStructure);
+
+	GPIOB->ODR = 0x0001;
+}
 /* Debug GPIO pins on PA0 */
 void config_gpio_dbg(void) {
 	GPIO_InitTypeDef  GPIO_InitStructure;
@@ -541,10 +538,6 @@ void load_rom(uint8_t slot, uint8_t rom_number_on_sdcard) {
 	int root_directory_base_length = strlen(root_directory);
 	int highslot;
 
-
-
-
-
 	// only handle slots 4 to 7 and 12 to 15
 	if (slot >=12 && slot <=15) {
         	swram = (char *) &swram_high_base;
@@ -615,13 +608,14 @@ int __attribute__((optimize("O0")))  main(void) {
 	register volatile unsigned char* copy_exti_base asm("s3") __attribute__((unused)) = (unsigned char*) EXTI;
 	// combo register:
 	//   b31-b16 - Effectively a copy of the lower 16 bits of the MODER register (for controlling whether PD2 is a GPIO or Alt function (for SDIO)
+	//             So 0010 is PD2 out
 	//   b15-b8  - Current state of PD2. Either 04 for PD2=1, or 00 for PD2=0
 	//   b7-b0   - Current ROM slot register (updated when a 6502 write to FE05 occurs)
-	register uint32_t copy_combo_register asm("s4") __attribute__((unused)) = 0x00100000;
+	register uint32_t copy_combo_register asm("s4") __attribute__((unused)) = 0x00110000;
 	register volatile unsigned char* copy_gpioa_base asm("s5") __attribute__((unused)) = (unsigned char*) GPIOA;
 	register volatile uint8_t* copy_swram_high_base asm("s6") __attribute__((unused)) = (volatile uint8_t*) &swram_high_base;
 	register volatile uint8_t* copy_swram_low_base asm("s7") __attribute__((unused)) = (volatile uint8_t*) &swram_low_base;
-	// 5555 = d15-d8 outputs and 0010 is d2 out
+	// 5555 = d15-d8 outputs and 0010 is d2 out, and 0010 is d2 out
 	register uint32_t copy_dataout_moder asm("s8") __attribute__((unused)) = 0x55550010;
 	register uint32_t copy_adc_data asm("s9") __attribute__((unused)) = 0x00000000;
 	// Use some of the high fpu registers as a sort of stack. eg. save r11 to s30 on ISR entry, then put it back on ISR exit
@@ -650,13 +644,17 @@ int __attribute__((optimize("O0")))  main(void) {
 
         config_backup_sram();
 	
-	config_gpio_data();
+	config_gpio_data(); // And PD0 (TUBE _CS) and PD2 (part of SD card interface)
 
 	config_gpio_addr();
 
 	config_gpio_portc();
 
+	config_gpio_portb();
+
         config_gpio_dbg();
+
+	setupOnePulse();
 
 	//NVIC_SystemLPConfig(NVIC_LP_SEVONPEND, ENABLE);
         NVIC_PriorityGroupConfig(NVIC_PriorityGroup_4); 
@@ -687,11 +685,12 @@ int __attribute__((optimize("O0")))  main(void) {
 	scan_and_load_roms();
 	//f_mount(0, "1:", 1); // unmount
 
-	config_PC0_int();
+	config_PC4_int();
 
 	int	check_adc_conversion_finished = 0;
 	uint16_t adc_value;
 	while(1) {
+
 		if (check_adc_conversion_finished) {
 			// check if conversion complete
 			if (ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC)) {
