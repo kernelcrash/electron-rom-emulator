@@ -10,32 +10,8 @@ A couple of key changes from previous versions
 
 - The previous version used to have PHI0 interrupting the STM32F4 on a negative edge then waiting for PHI0 to go high, check the address bus and exit quickly if the memory access was unrelated to a ROM or IO register that the board was emulating. That 'exit quickly' was meant to 'give time back to the main.c main while loop that manages some disk access and the joystick control. Under seemingly rare circumstances you could starve the main loop of any time if say you had a tight loop executing from ROM.
 - The new idea is to have a one shot timer trigger when PHI0 goes low. The one shot is configured to fire a +ve going pulse that is tied to an EXTI line. This means we can interrupt the STM32F4 some time between the -ve edge of PHI0 and the +ve edge. Because it takes about 100ns from the interrupt trigger to the STM32F4 actually executing any EXTI code, we can adjust the timing such that the first line of our EXTI code executes close to the +ve edge of PHI0. The net effect is that we give more time back to the main loop on every cycle. The way this is wired is that PHI0 is still connected to PC0, but we also connect PHI0 to PB7 (the input to the timer). The one shot output PB6 is then tied to PC4 which is now the EXTI interrupt (we no longer interrupt on PC0).
-- The previous version used WFE to wait for a PHI0 cycle to end. I've gone back to just using a tight loop ldr/tst/bne loop as we need to wait a a few nanoseconds after the end of the cycle before tri-stating anyway.
-- I now generate a chip select signal for 0xFCEx on PB0. This is so you can wire in a 40 pin tube connector and hook up a pitubedirect. Note, I found the 74LVC245 tranceivers and the stm32f407 don't exactly like each other, and on the pitubedirect I'd suggest putting series resistors on the datalines (similar to the pitubedirect kits for the BBC Master). I put 270 ohm resistors on each data line
-
-
-TIM Version
-===========
-
-Basic idea is to have the benfefits of positive edge triggering on phi0 but using
-a one-shot pulse off the negative edge in order to factor in the 100ns delay before
-the EXTI handler kicks in. ie. the EXTI interrupt is no longer off the +ve edge of 
-phi0 but a sort of preemptive +ve edge created from the one-shot.
-
-phi0 is connected to both PC0 and PB7.
-PC0 is just a GPIO input. 
-PB7 is an edge trigger that kicks off a one-pulse timer in TIM4. It triggers on the -ve edge of phi0 
-at the end of a 6502 bus clock cycle.
-The one-pulse is output on PB6 as a +ve going pulse that occurs about 150ns into the low part of phi0.
-PB6 is tied to PC4 which is configure as an EXTI4 external interrupt.
-The EXTI4 interrupt handler will execute its first line about 100ns after the one-pulse
-goes high. Given that phi0 is low for about 250ns, that means the EXTI4 handler is 
-executing just after phi0 actually goes high. So that means the code can read the 
-address bus, data bus, and read/write and start to process it.
-
-For the cycles where the EXTI4 handler needs to wait till the falling edge
-of phi0, we just loop looking for it go low. In prior testing this seems
-more reliable than waiting got a -ve edge using WFE.
+- The previous version used WFE to wait for a PHI0 cycle to end. I've gone back to just using a tight ldr/tst/bne loop as we need to wait a few nanoseconds after the end of the cycle before tri-stating anyway.
+- I now generate a TUBE chip select signal for 0xFCEx on PB0. This is so you can wire in a 40 pin tube connector and hook up a pitubedirect. Note, I found the 74LVC245 tranceivers and the stm32f407 don't exactly like each other, and on the pitubedirect I'd suggest putting series resistors on the datalines (similar to the pitubedirect kits for the BBC Master). I put 270 ohm resistors on each data line
 
 
 Overview
@@ -196,7 +172,7 @@ If you add on the optional TUBE interface you will need to wire the
 40 pin TUBE connector like so (p18 means pin 18 on the Electron
 expansion connector)
 ```
-GND     1	2  R/_W (p18)
+GND     1   2  R/_W (p18)
 GND     3   4  PHI0 (p14)
 GND     5   6  TIRQ (not connected)
 GND     7   8  TTUBE (goes to PB0)
